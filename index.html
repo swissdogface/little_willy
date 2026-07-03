@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Little Willy — Where is mama?</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🍭</text></svg>">
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="1280" height="800"></canvas>
+  <div id="hud">
+    <div class="hud-left">
+      <span id="hud-level"></span>
+    </div>
+    <div class="hud-right">
+      <span id="hud-items"></span>
+      <span id="hud-card"></span>
+      <span id="hud-lives"></span>
+      <button id="btn-sound" title="Sound on/off">🔊</button>
+      <button id="btn-full" title="Fullscreen">⛶</button>
+    </div>
+  </div>
+  <div id="touch-controls">
+    <div class="tc-left">
+      <button data-k="left">◀</button><button data-k="right">▶</button>
+    </div>
+    <div class="tc-right">
+      <button data-k="jump">▲</button><button data-k="shot">✦</button>
+    </div>
+  </div>
+</div>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/render.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
