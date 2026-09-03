@@ -2,24 +2,39 @@
 """Little Willy asset pipeline.
 
 Decodes the original DOS data files (LEV/SPR/BST/DAT) into JSON + PNG
-assets for the browser remake, including 4x pixel-art upscaling.
+assets for the browser remake.  All graphics are exported at their
+native resolution (1 px = 1 px); the renderer scales them with
+nearest-neighbour filtering, so the pixel art stays crisp.
 
-Formats (reverse-engineered from LW5.EXE):
+Formats (reverse-engineered from LW5.EXE, Turbo-C, huge model):
   .BST  n tiles x 128 bytes: 16x16 px, 4 EGA bitplanes (B,G,R,I), 2 bytes/row
   .SPR  per sprite: [width_bytes][height] + 4 pre-shifted copies x 5 planes
         (B,G,R,I + mask; mask bit 1 = transparent), width_bytes*height
-        bytes per plane. Copy 0 (unshifted) used.
+        bytes per plane. Copy 0 (unshifted) is used.
   .LEV  960 bytes map (24 rows x 40 cols) -> attr = byte>>6
-        (0 pass, 1 solid, 2 special, 3 deadly), tile = byte&0x3f.
-        + enemies (91 B: x,x2,y,y2 words; type byte; minx,maxx,miny,maxy
-          words; 4 bytes params; 70-byte anim program [dur,sprite]... 0xff)
+        (0 free, 1 solid, 2 one-way platform, 3 deadly), tile = byte&0x3f.
+        + enemies (91 B each):
+            x, x2, y, y2      words (x2/y2 = second video page copy)
+            speed             byte  (>=100: slow mover, 1 px / (speed-100) steps)
+            minx, maxx        words (patrol bounds, compared with the sprite origin)
+            miny, maxy        words
+            dir               byte  (0 right,1 left,2 up,3 down,4 arc,5 bounce,
+                                     6 random walk,7 homing)
+            kind              byte  (0 enemy, 1 platform, 2 special platform,
+                                     other = harmless decoration)
+            hp                byte  (0xff = invulnerable)
+            reset             byte  (animation index used when turning right)
+            program           70 bytes: [duration, sprite] pairs,
+                                     0xfe = loop to 0, 0xff = loop to reset
         + items (6 B: x,y words, sprite byte (80..89 = SPEZ), kind byte:
-          0 = required collectible, 1 = bonus, 2 = wall-remover, 3 = exit card)
+          0 = collectible (80/88/89 count), 1 = key, 2 = card (sits inside a
+          solid "mystical stone"), 3 = exit card)
         + deco sprites (5 B: x,y words, sprite byte)
-        + tail: willy x,y; facing; scroll x,y; exit x,y; required count
+        + tail: willy x,y; start frame (0 = facing left, 12 = right);
+          scroll x,y; exit x,y; required count
   .DAT  BMP (some with patched magic), 16-color
-Hub doors: LMAIN map scanned row-major for door tops (tile 0x10/0x14/0x18
-with +1 right and +2 below) -> door i = level i+1. 24 doors.
+The 24 hub doors are hard-coded in LW5.EXE (function at file offset
+0x77d4); door n leads to level n, door 1 is the final level.
 """
 import json
 import os
@@ -66,7 +81,63 @@ LEVELS = {
     24: dict(lev='L24.LEV', spr='L03.SPR', bst='L03.BST', bg=None),
 }
 
-SCALE = 4
+# sprite slot ranges per level: [start, end, atlasKey] (load_spr calls in LW5.EXE)
+SPR_RANGES = {
+    0: [[31, 34, 'lmain']],
+    1: [[31, 44, 'l01']],
+    2: [[31, 52, 'l02']],
+    3: [[31, 61, 'l03']],
+    4: [[31, 59, 'l04'], [60, 64, 'l02']],
+    5: [[31, 62, 'l05']],
+    6: [[31, 50, 'l06']],
+    7: [[31, 51, 'l03'], [52, 61, 'l07']],
+    8: [[31, 62, 'l05']],
+    9: [[31, 46, 'l09']],
+    10: [[31, 39, 'l10']],
+    11: [[31, 48, 'l11']],
+    12: [[31, 62, 'l05']],
+    13: [[31, 59, 'l13']],
+    14: [[31, 61, 'l03']],
+    15: [[31, 39, 'l10']],
+    16: [[31, 48, 'l11']],
+    17: [[31, 52, 'l02']],
+    18: [[31, 59, 'l04']],
+    19: [[31, 40, 'l07']],
+    20: [[31, 46, 'l09']],
+    21: [[31, 39, 'l10']],
+    22: [[31, 50, 'l06']],
+    23: [[31, 59, 'l13']],
+    24: [[31, 61, 'l03']],
+}
+
+# hub doors, hard-coded in LW5.EXE: door n -> level n
+DOORS = [
+    (16, 100), (400, 100), (112, 100), (16, 196), (496, 100), (400, 148),
+    (496, 148), (400, 244), (592, 148), (448, 340), (64, 244), (544, 244),
+    (304, 244), (16, 292), (400, 340), (208, 340), (544, 340), (304, 340),
+    (544, 196), (544, 292), (352, 292), (352, 340), (256, 340), (112, 244),
+]
+
+# Willy frame -> WILLY.SPR sprite (table at DS:0x67 in LW5.EXE)
+WILLY_FRAMES = [0, 2, 3, 4, 3, 2, 0, 5, 6, 7, 6, 5,
+                8, 10, 11, 12, 11, 10, 8, 13, 14, 15, 14, 13,
+                1, 9, 16, 17, 18, 19, 19, 20, 21]
+
+# jump height table (DS:0x21), 18 rising phases; descent mirrors it
+JUMP_TABLE = [4, 8, 12, 16, 20, 24, 27, 30, 32, 35, 37, 39, 40, 41, 42, 43, 43, 44]
+
+# PC speaker effects: (frequency Hz, duration in frames) pairs, 1 Hz = rest
+SOUNDS = {
+    'shoot':     [(80, 1), (100, 1), (300, 1), (500, 1), (200, 1), (100, 2), (80, 3), (20, 4)],
+    'explosion': [(20, 4), (40, 4), (30, 4), (20, 4)],
+    'hurt':      [(40, 2), (100, 2), (40, 2), (100, 2), (40, 2), (100, 1), (40, 1), (100, 1), (40, 1)],
+    'enemyhit':  [(40, 8), (1, 8), (40, 8)],
+    'death':     [(2000, 2), (1800, 3), (1500, 2), (1100, 1), (600, 1), (500, 1), (400, 1)],
+    'rise':      [(100, 2), (200, 2), (350, 2), (750, 2), (1000, 2), (1300, 2)],
+    'fall':      [(70, 2), (50, 3), (40, 4), (30, 5), (20, 8)],
+    'pickup':    [(2000, 1), (2020, 1), (2040, 1), (2060, 1), (2040, 1), (2020, 1), (2000, 1)],
+    'card':      [(2100, 2), (2080, 2), (2060, 2), (2040, 2), (2020, 2), (2000, 2), (1800, 2)],
+}
 
 
 def rp(name):
@@ -136,20 +207,14 @@ def parse_lev(fn):
     enemies = []
     for _ in range(n1):
         x, x2, y, y2 = struct.unpack('<4H', d[pos:pos + 8])
-        typ = d[pos + 8]
+        speed = d[pos + 8]
         minx, maxx, miny, maxy = struct.unpack('<4H', d[pos + 9:pos + 17])
-        b = list(d[pos + 17:pos + 21])
-        raw = d[pos + 21:pos + 91]
-        prog = []
-        for i in range(0, 70, 2):
-            if raw[i] == 0xff:
-                break
-            if raw[i] == 0 and raw[i + 1] == 0:
-                break
-            prog.append([raw[i], raw[i + 1]])
-        enemies.append(dict(x=x, y=y, type=typ,
+        direction, kind, hp, reset = d[pos + 17:pos + 21]
+        prog = list(d[pos + 21:pos + 91])
+        enemies.append(dict(x=x, y=y, speed=speed,
                             minx=minx, maxx=maxx, miny=miny, maxy=maxy,
-                            b=b, prog=prog))
+                            dir=direction, kind=kind, hp=hp, reset=reset,
+                            prog=prog))
         pos += 91
     n2 = d[pos]; pos += 1
     items = []
@@ -177,64 +242,10 @@ def load_dat(fn):
     return Image.open(io.BytesIO(bytes(d))).convert('RGBA')
 
 
-# ------------------------------------------------------------- upscaling
-
-def scale2x(img):
-    w, h = img.size
-    src = img.load()
-    out = Image.new('RGBA', (w * 2, h * 2))
-    dst = out.load()
-
-    def at(x, y):
-        return src[max(0, min(w - 1, x)), max(0, min(h - 1, y))]
-
-    for y in range(h):
-        for x in range(w):
-            c = at(x, y)
-            a = at(x, y - 1)
-            b = at(x + 1, y)
-            l = at(x - 1, y)
-            d = at(x, y + 1)
-            e0 = l if (l == a and l != d and a != b) else c
-            e1 = b if (a == b and a != l and b != d) else c
-            e2 = l if (d == l and d != b and l != a) else c
-            e3 = b if (b == d and b != a and d != l) else c
-            dst[x * 2, y * 2] = e0
-            dst[x * 2 + 1, y * 2] = e1
-            dst[x * 2, y * 2 + 1] = e2
-            dst[x * 2 + 1, y * 2 + 1] = e3
-    return out
-
-
-def antialias_diag(img):
-    """Soften remaining stair-steps by blending hard diagonal corners."""
-    w, h = img.size
-    src = img.copy().load()
-    out = img
-    dst = out.load()
-    for y in range(1, h - 1):
-        for x in range(1, w - 1):
-            c = src[x, y]
-            n, s = src[x, y - 1], src[x, y + 1]
-            wl, e = src[x - 1, y], src[x + 1, y]
-            for d1, d2 in ((n, wl), (n, e), (s, wl), (s, e)):
-                if d1 == d2 and d1 != c and d1[3] == 255 and c[3] == 255:
-                    dst[x, y] = tuple((a * 2 + b) // 3 for a, b in zip(c, d1))
-                    break
-    return out
-
-
-def upscale4(img, smooth=True):
-    up = scale2x(scale2x(img))
-    if smooth:
-        up = antialias_diag(up)
-    return up
-
-
 # --------------------------------------------------------------- atlases
 
-def pack_sheet(images, pad=2):
-    cols = min(10, max(1, len(images)))
+def pack_sheet(images, pad=1):
+    cols = min(16, max(1, len(images)))
     cw = max(i.width for i in images) + pad
     ch = max(i.height for i in images) + pad
     rows = (len(images) + cols - 1) // cols
@@ -244,13 +255,16 @@ def pack_sheet(images, pad=2):
         x = (i % cols) * cw
         y = (i // cols) * ch
         sheet.paste(im, (x, y))
-        frames.append(dict(x=x, y=y, w=im.width, h=im.height))
+        frames.append([x, y, im.width, im.height])
     return sheet, frames
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
     os.makedirs(os.path.join(OUT, 'screens'), exist_ok=True)
+    for f in os.listdir(OUT):
+        if f.endswith('.png'):
+            os.remove(os.path.join(OUT, f))
 
     atlas = {}
 
@@ -260,37 +274,34 @@ def main():
     spr_files += ['SPEZ.SPR', 'WILLY.SPR', 'LEND.SPR']
     for fn in spr_files:
         sprites = parse_spr(fn)
-        ups = [upscale4(spr_img(w, h, p)) for w, h, p in sprites]
-        sheet, frames = pack_sheet(ups)
+        imgs = [spr_img(w, h, p) for w, h, p in sprites]
+        sheet, frames = pack_sheet(imgs)
         key = fn.replace('.SPR', '').lower()
         sheet.save(os.path.join(OUT, f'spr_{key}.png'))
-        atlas[key] = dict(file=f'spr_{key}.png',
-                          frames=frames,
-                          logical=[[w * 8, h] for w, h, _ in sprites])
+        atlas[key] = dict(file=f'spr_{key}.png', frames=frames)
         print(f'{fn}: {len(sprites)} sprites')
 
     # ---- tiles
     bst_files = sorted({cfg['bst'] for cfg in LEVELS.values() if cfg['bst']})
     for fn in bst_files:
         tiles = parse_bst(fn)
-        ups = [upscale4(t) for t in tiles]
-        sheet, frames = pack_sheet(ups, pad=0)
+        sheet, frames = pack_sheet(tiles, pad=0)
         key = fn.replace('.BST', '').lower()
         sheet.save(os.path.join(OUT, f'bst_{key}.png'))
-        atlas['bst_' + key] = dict(file=f'bst_{key}.png', frames=frames,
-                                   count=len(tiles))
+        atlas['bst_' + key] = dict(file=f'bst_{key}.png', frames=frames)
         print(f'{fn}: {len(tiles)} tiles')
 
     # ---- level 1 background + full-screen art
-    lvl1 = load_dat('LEVEL1.DAT')
-    upscale4(lvl1, smooth=True).save(os.path.join(OUT, 'level1_bg.png'))
+    load_dat('LEVEL1.DAT').save(os.path.join(OUT, 'level1_bg.png'))
     for fn, key in [('TITLE2.DAT', 'title'), ('DIM.DAT', 'dim'),
                     ('END.DAT', 'end'), ('STORY2.DAT', 'story2'),
                     ('STORY6.DAT', 'story6'), ('STORY11.DAT', 'story11'),
                     ('STORY13.DAT', 'story13')]:
         img = load_dat(fn)
-        upscale4(img).save(os.path.join(OUT, f'screens/{key}.png'))
-        print(f'{fn} -> screens/{key}.png')
+        if key == 'title':
+            img = img.crop((0, 0, img.width, img.height // 2))
+        img.save(os.path.join(OUT, f'screens/{key}.png'))
+        print(f'{fn} -> screens/{key}.png {img.size}')
 
     # ---- levels
     levels = {}
@@ -298,26 +309,14 @@ def main():
         m, enemies, items, deco, tail = parse_lev(cfg['lev'])
         levels[n] = dict(
             map=m, enemies=enemies, items=items, deco=deco, **tail,
-            spr=cfg['spr'].replace('.SPR', '').lower(),
-            spr2=cfg.get('spr2', '').replace('.SPR', '').lower() or None,
+            ranges=SPR_RANGES[n],
             bst=(cfg['bst'] or '').replace('.BST', '').lower() or None,
             bg='level1_bg.png' if cfg['bg'] else None,
         )
+    levels[0]['doors'] = [dict(x=x, y=y, level=i + 1) for i, (x, y) in enumerate(DOORS)]
 
-    # hub doors: row-major scan for door-top tiles
-    m = levels[0]['map']
-    doors = []
-    for r in range(24):
-        for c in range(40):
-            v = m[r * 40 + c] & 0x3f
-            if v in (0x10, 0x14, 0x18) and c + 1 < 40 and r + 1 < 24 \
-               and (m[r * 40 + c + 1] & 0x3f) == v + 1 \
-               and (m[(r + 1) * 40 + c] & 0x3f) == v + 2:
-                doors.append(dict(x=c * 16, y=r * 16, level=len(doors) + 1))
-    levels[0]['doors'] = doors
-    print(f'hub doors: {len(doors)}')
-
-    game = dict(levels=levels, atlas=atlas)
+    game = dict(levels=levels, atlas=atlas, willyFrames=WILLY_FRAMES,
+                jumpTable=JUMP_TABLE, sounds=SOUNDS)
     with open(os.path.join(OUT, 'gamedata.json'), 'w') as f:
         json.dump(game, f, separators=(',', ':'))
     size = os.path.getsize(os.path.join(OUT, 'gamedata.json'))

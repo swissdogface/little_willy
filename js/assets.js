@@ -1,4 +1,4 @@
-/* Asset loading: gamedata.json + sprite/tile atlases + screens. */
+/* Asset loading: gamedata.json + native-resolution sprite/tile atlases + screens. */
 'use strict';
 
 const Assets = (() => {
@@ -9,7 +9,7 @@ const Assets = (() => {
     return new Promise((res, rej) => {
       const img = new Image();
       img.onload = () => res(img);
-      img.onerror = rej;
+      img.onerror = () => rej(new Error('cannot load ' + src));
       img.src = src;
     });
   }
@@ -36,19 +36,33 @@ const Assets = (() => {
 
   function img(file) { return images[file]; }
 
-  /** atlas frame for sprite slot within a given SPR atlas key */
+  /** frame of sprite `index` inside atlas `key`: {img,x,y,w,h} */
   function sprFrame(key, index) {
     const a = data.atlas[key];
     if (!a || index < 0 || index >= a.frames.length) return null;
-    return { img: images[a.file], f: a.frames[index], logical: a.logical[index] };
+    const f = a.frames[index];
+    return { img: images[a.file], x: f[0], y: f[1], w: f[2], h: f[3] };
   }
 
   function tileFrame(bstKey, index) {
     const a = data.atlas['bst_' + bstKey];
     if (!a || index >= a.frames.length) return null;
-    return { img: images[a.file], f: a.frames[index] };
+    const f = a.frames[index];
+    return { img: images[a.file], x: f[0], y: f[1], w: f[2], h: f[3] };
   }
 
-  return { load, img, sprFrame, tileFrame,
+  /** resolve a level sprite slot (0..30 Willy, 31+ level set, 80+ SPEZ) */
+  function resolveSlot(level, slot) {
+    if (slot >= 80) return ['spez', slot - 80];
+    if (slot >= 31) {
+      for (const [a, b, key] of level.ranges) {
+        if (slot >= a && slot <= b) return [key, slot - a];
+      }
+      return [null, 0];
+    }
+    return ['willy', slot];
+  }
+
+  return { load, img, sprFrame, tileFrame, resolveSlot,
            get data() { return data; } };
 })();

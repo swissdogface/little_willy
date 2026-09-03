@@ -1,334 +1,77 @@
-/* Little Willy core game logic — faithful port of the DOS original:
- * same 25 levels (hub maze + 24), same map attributes
- * (pass/solid/special/deadly), same items (required collectibles,
- * bonus, wall-removers, exit card), same enemy patrol data,
- * same physics feel (walk ~60 px/s, 2-tile jump). */
+/* Little Willy — game simulation.
+ *
+ * A faithful re-implementation of the movement, collision, enemy, item and
+ * shot logic of LW5.EXE (reverse-engineered).  The original runs at one
+ * video page flip per ~28.6 ms (a 25 ms BIOS timer synchronised to the
+ * 70 Hz retrace), i.e. 35 logic frames per second, and works entirely in
+ * integer pixels on a 640x384 world of 16x16 tiles.  Every constant below
+ * (2 px per frame walking, the 37-phase jump table, 6/4/2 px falling, the
+ * probe points, the enemy behaviours, ...) comes from the executable. */
 'use strict';
 
 const Game = (() => {
-  // physics constants (derived from the original: 4 px/tick @ ~15 Hz,
-  // jump apex 32 px, symmetric arc)
-  const WALK = 62;          // px/s
-  const JUMP_V = -238;      // px/s
-  const GRAV = 900;         // px/s^2
-  const FALL_MAX = 260;
-  const SHOT_V = 210;
-  const TICK = 1 / 15;      // enemy/anim tick, like the DOS timer
+  const TICK_HZ = 35;
+  const TICK = 1 / TICK_HZ;
+  const WORLD_W = 640, WORLD_H = 384;
+  const VW = 320, VH = 200;
 
-  // Willy sprite frames (WILLY.SPR slots)
-  const FR_L0 = 0, FR_R0 = 12;   // stand/walk cycle bases
-  const WALK_FRAMES = 12;
+  // map attributes
+  const A_FREE = 0, A_SOLID = 1, A_PLATFORM = 2, A_DEADLY = 3;
 
-  // slot ranges per level: [start, end, atlasKey] (mirrors LW5.EXE)
-  const SPR_RANGES = {
-    0: [[31, 34, 'lmain']],
-    1: [[31, 44, 'l01']],
-    2: [[31, 52, 'l02']],
-    3: [[31, 61, 'l03']],
-    4: [[31, 59, 'l04'], [60, 64, 'l02']],
-    5: [[31, 62, 'l05']],
-    6: [[31, 50, 'l06']],
-    7: [[31, 51, 'l03'], [52, 61, 'l07']],
-    8: [[31, 62, 'l05']],
-    9: [[31, 46, 'l09']],
-    10: [[31, 39, 'l10']],
-    11: [[31, 48, 'l11']],
-    12: [[31, 62, 'l05']],
-    13: [[31, 59, 'l13']],
-    14: [[31, 61, 'l03']],
-    15: [[31, 39, 'l10']],
-    16: [[31, 48, 'l11']],
-    17: [[31, 52, 'l02']],
-    18: [[31, 59, 'l04']],
-    19: [[31, 40, 'l07']],
-    20: [[31, 46, 'l09']],
-    21: [[31, 39, 'l10']],
-    22: [[31, 50, 'l06']],
-    23: [[31, 59, 'l13']],
-    24: [[31, 61, 'l03']],
-  };
+  let JT = null;          // jump table (18 rising phases)
+  let WF = null;          // Willy frame -> sprite table
 
   const st = {
-    mode: 'boot',        // boot,title,menu,story,info,play,dying,complete,gameover,end
+    mode: 'boot',         // boot,title,menu,story,info,play,complete,end,message
     levelNo: 0,
     level: null,
     map: null,
     items: [],
     enemies: [],
+    deco: [],
     doorsDone: {},
-    lives: 4,
-    score: 0,
-    // willy
-    wx: 0, wy: 0, vy: 0, onGround: false, face: 1,
-    walkPhase: 0, airborne: false,
-    needed: 0, card: false, cardNeeded: false,
+    hubReturn: null,      // {x,y,cx,cy} position in the hub after leaving a level
+    tick: 0,              // page flips
+    iter: 0,              // main loop iterations (2 flips)
+    time: 0,
+    cam: { x: 0, y: 0, px: 0, py: 0 },
+    w: null,              // Willy
     shot: null,
-    cam: { x: 0, y: 0 },
-    t: 0, tick: 0, fadeT: 0,
-    hubReturn: null,     // where to respawn in hub after a level
-    storyIdx: 0,
-    infoLines: [],
+    expl: null,
+    energy: 4, inv: 0,
+    needed: 0, card: false,
+    keys: { 81: false, 82: false, 83: false },
+    result: null,         // 'complete' | 'dead' | {door:n} set by the simulation
     lastDoor: -1,
-    endT: 0,
+    stats: { shots: 0, kills: 0 },
   };
+
+  // ------------------------------------------------------------- helpers
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  function attr(r, c) {
+    if (c < 0 || c > 39 || r < 0 || r > 23) return A_SOLID;
+    return st.map[r * 40 + c] >> 6;
+  }
+  function solid(r, c) { return attr(r, c) === A_SOLID; }
 
   function saveProgress() {
     try {
-      localStorage.setItem('lw_progress', JSON.stringify({
-        doors: st.doorsDone, score: st.score,
-      }));
+      localStorage.setItem('lw_progress', JSON.stringify({ doors: st.doorsDone }));
     } catch (e) { /* private mode */ }
   }
 
   function loadProgress() {
     try {
       const p = JSON.parse(localStorage.getItem('lw_progress') || 'null');
-      if (p) { st.doorsDone = p.doors || {}; st.score = p.score || 0; }
+      if (p && p.doors) st.doorsDone = p.doors;
     } catch (e) { /* ignore */ }
   }
 
-  function resolveSprite(levelNo, slot) {
-    if (slot >= 80) return ['spez', slot - 80];
-    if (slot >= 31) {
-      for (const [a, b, key] of SPR_RANGES[levelNo]) {
-        if (slot >= a && slot <= b) return [key, slot - a];
-      }
-      return [null, 0];
-    }
-    return ['willy', slot];
-  }
-
-  // ------------------------------------------------------------ level setup
-  function enterLevel(n, fromDoor) {
-    const L = Assets.data.levels[n];
-    st.levelNo = n;
-    st.level = L;
-    st.map = L.map.slice();
-    st.items = L.items.map(it => ({ ...it, taken: false }));
-    st.enemies = L.enemies.map(e => initEnemy(e));
-    st.wx = L.wx; st.wy = L.wy;
-    st.vy = 0; st.onGround = false;
-    st.face = 1;
-    st.shot = null;
-    st.cam.x = clamp(L.scx, 0, 640 - Renderer.VW);
-    st.cam.y = clamp(L.scy, 0, 384 - Renderer.VH);
-    st.needed = L.need;
-    st.cardNeeded = L.items.some(it => it.kind === 3);
-    st.card = !st.cardNeeded;
-    st.lastDoor = fromDoor !== undefined ? fromDoor : st.lastDoor;
-    Renderer.initBackdrop(n + 7);
-    if (n === 0 && st.hubReturn) {
-      st.wx = st.hubReturn.x; st.wy = st.hubReturn.y;
-      st.cam.x = clamp(st.wx - Renderer.VW / 2, 0, 640 - Renderer.VW);
-      st.cam.y = clamp(st.wy - Renderer.VH / 2, 0, 384 - Renderer.VH);
-    }
-    Audio2.music(n === 0 ? 'hub' : 'level');
-    updateHud();
-  }
-
-  function initEnemy(e) {
-    const wide = e.maxx - e.minx > 20;
-    const tall = e.maxy - e.miny > 20;
-    let sx = 0, sy = 0;
-    if (e.b[1] === 1) {              // vertical mover flag
-      sy = e.b[0] || e.b[2] || 2;
-    } else {
-      sx = wide ? (e.b[0] || e.b[2] || 2) : 0;
-      sy = tall ? (e.b[2] || (wide ? 0 : e.b[0]) || (wide ? 0 : 2)) : 0;
-    }
-    // px per tick -> px/s at 15 Hz
-    return { ...e, px: e.x, py: e.y, dx: (sx || 0) * 15, dy: (sy || 0) * 15,
-             dirx: 1, diry: 1, progIdx: 0, progT: 0, alive: true,
-             sprite: e.prog.length ? e.prog[0][1] : 31 };
-  }
-
-  // ------------------------------------------------------------- collision
-  function attrAt(x, y) {
-    const c = Math.floor(x / 16), r = Math.floor(y / 16);
-    if (c < 0 || c > 39 || r < 0 || r > 23) return 1;
-    return st.map[r * 40 + c] >> 6;
-  }
-
-  function solidAt(x, y) { return attrAt(x, y) === 1; }
-
-  // Willy hitbox inside his 24x16 sprite (matches original probe points)
-  const BL = 6, BR = 17, BT = 1, BB = 15;
-
-  function collideH(nx) {
-    const dir = nx > st.wx ? 1 : -1;
-    const edge = dir > 0 ? nx + BR : nx + BL;
-    if (solidAt(edge, st.wy + BT + 2) || solidAt(edge, st.wy + BB - 1) ||
-        solidAt(edge, st.wy + 8)) {
-      return true;
-    }
-    return false;
-  }
-
-  function groundBelow(y) {
-    return solidAt(st.wx + BL + 1, y + BB + 1) || solidAt(st.wx + BR - 1, y + BB + 1) ||
-           solidAt(st.wx + 12, y + BB + 1);
-  }
-
-  function ceilingAbove(y) {
-    return solidAt(st.wx + BL + 1, y + BT) || solidAt(st.wx + BR - 1, y + BT);
-  }
-
-  // ------------------------------------------------------------------ play
-  function updatePlay(dt) {
-    st.t += dt * 1000;
-    const inp = Input.state;
-
-    // horizontal
-    let dx = 0;
-    if (inp.left) { dx = -WALK * dt; st.face = -1; }
-    else if (inp.right) { dx = WALK * dt; st.face = 1; }
-    if (dx !== 0) {
-      const nx = st.wx + dx;
-      if (!collideH(nx)) st.wx = clamp(nx, -BL, 640 - BR - 1);
-      st.walkPhase += Math.abs(dx) * 0.25;
-    }
-
-    // jump
-    if (Input.consume('jump') && st.onGround) {
-      // door entry in the hub has priority over jumping
-      if (st.levelNo === 0 && tryEnterDoor()) return;
-      st.vy = JUMP_V;
-      st.onGround = false;
-      Audio2.play('jump');
-    }
-
-    // gravity
-    st.vy = Math.min(st.vy + GRAV * dt, FALL_MAX);
-    let ny = st.wy + st.vy * dt;
-    if (st.vy > 0) {
-      // falling: land on solid
-      while (groundBelow(ny) && ny > st.wy - 20) ny -= 1;
-      if (groundBelow(ny + 0.5)) {
-        // snap to tile top
-        ny = Math.round((ny + BB + 1) / 16) * 16 - BB - 1;
-        if (!st.onGround && st.vy > 140) Audio2.play('step');
-        st.vy = 0;
-        st.onGround = true;
-      } else {
-        st.onGround = false;
-      }
-    } else if (st.vy < 0) {
-      if (ceilingAbove(ny)) {
-        ny = st.wy;
-        st.vy = 0;
-      }
-      st.onGround = false;
-    }
-    st.wy = clamp(ny, 0, 384 - 16);
-    if (st.wy >= 384 - 16 && !groundBelow(st.wy)) {
-      // fell out of the world
-      return die();
-    }
-
-    // still on ground?
-    if (st.onGround && !groundBelow(st.wy)) st.onGround = false;
-
-    // deadly tile under feet (original: probe at x+8, y+18)
-    if (attrAt(st.wx + 12, st.wy + 17) === 3 || attrAt(st.wx + 12, st.wy + 10) === 3) {
-      return die();
-    }
-
-    // shooting
-    if (Input.consume('shot') && !st.shot) {
-      st.shot = { x: st.wx + (st.face > 0 ? 20 : -4), y: st.wy + 6,
-                  vx: st.face * SHOT_V, t: 0 };
-      Audio2.play('shoot');
-    }
-    if (st.shot) {
-      st.shot.x += st.shot.vx * dt;
-      st.shot.t += dt;
-      if (st.shot.x < -10 || st.shot.x > 640 ||
-          solidAt(st.shot.x + 4, st.shot.y + 3)) {
-        st.shot = null;
-      } else {
-        for (const e of st.enemies) {
-          if (!e.alive) continue;
-          const [key, idx] = resolveSprite(st.levelNo, e.sprite);
-          const fr = Assets.sprFrame(key, idx);
-          const w = fr ? fr.logical[0] : 24, h = fr ? fr.logical[1] : 16;
-          if (st.shot.x > e.px - 4 && st.shot.x < e.px + w &&
-              st.shot.y > e.py - 6 && st.shot.y < e.py + h) {
-            e.alive = false;
-            st.score += 100;
-            Renderer.burst(e.px + w / 2, e.py + h / 2, '#ffcf5a', 18, 120);
-            Audio2.play('hitEnemy');
-            st.shot = null;
-            break;
-          }
-        }
-      }
-    }
-
-    // fixed-rate tick for enemies/animation (original 15 Hz feel)
-    st.tick += dt;
-    while (st.tick >= TICK) {
-      st.tick -= TICK;
-      tickEnemies();
-    }
-    // enemy contact
-    for (const e of st.enemies) {
-      if (!e.alive) continue;
-      const [key, idx] = resolveSprite(st.levelNo, e.sprite);
-      const fr = Assets.sprFrame(key, idx);
-      const w = fr ? fr.logical[0] : 24, h = fr ? fr.logical[1] : 16;
-      if (st.wx + BR > e.px + 3 && st.wx + BL < e.px + w - 3 &&
-          st.wy + BB > e.py + 3 && st.wy + BT < e.py + h - 3) {
-        return die();
-      }
-    }
-
-    // items
-    for (const it of st.items) {
-      if (it.taken) continue;
-      if (Math.abs(it.x - st.wx) <= 16 && Math.abs(it.y - st.wy) <= 16) {
-        it.taken = true;
-        onItem(it);
-      }
-    }
-
-    // exit (levels): original checks |wx+4-exx|<16, wy-exy<32,
-    // card collected and all required items taken
-    if (st.levelNo !== 0 && (st.level.exx || st.level.exy)) {
-      if (Math.abs(st.wx + 4 - st.level.exx) < 16 &&
-          Math.abs(st.wy - st.level.exy) < 32 &&
-          st.card && st.needed <= 0) {
-        return completeLevel();
-      }
-    }
-
-    updateCamera(dt);
-    Renderer.updateParticles(dt);
-  }
-
-  function tryEnterDoor() {
-    for (const d of st.level.doors) {
-      if (st.doorsDone[d.level]) continue;
-      if (Math.abs(st.wx + 4 - (d.x + 8)) < 18 && st.wy + 15 >= d.y &&
-          st.wy <= d.y + 32) {
-        // door 1 leads to the FINAL level (the prison, L01) — only
-        // playable once every other level is done (as in the original)
-        if (d.level === 1 && !allDoneExcept(1)) {
-          st.mode = 'info';
-          st.infoLines = ['*** Little Willy ***', '',
-                          'This is the last level!',
-                          'At first, play all other levels.', '',
-                          '> Press any key <'];
-          Input.onAnyKey(() => { st.mode = 'play'; });
-          Audio2.play('denied');
-          return true;
-        }
-        st.hubReturn = { x: d.x, y: d.y + 16 };
-        Audio2.play('door');
-        showLevelInfo(d.level);
-        return true;
-      }
-    }
-    return false;
+  function doorsDoneCount() {
+    let n = 0;
+    for (let i = 1; i <= 24; i++) if (st.doorsDone[i]) n++;
+    return n;
   }
 
   function allDoneExcept(n) {
@@ -336,134 +79,622 @@ const Game = (() => {
     return true;
   }
 
-  function showLevelInfo(n) {
-    // item sprites: 80/88 = drink-boxes, 89 = lollypop, 81-83 = keys (bonus),
-    // 84-86 = cards that remove mystical stones, 87 = exit card
+  function spriteSize(slot) {
+    const [key, idx] = Assets.resolveSlot(st.level, slot);
+    const fr = key ? Assets.sprFrame(key, idx) : null;
+    return fr ? [fr.w, fr.h] : [24, 16];
+  }
+
+  // -------------------------------------------------------------- level
+  function init(data) {
+    JT = data.jumpTable;
+    WF = data.willyFrames;
+  }
+
+  function enterLevel(n) {
     const L = Assets.data.levels[n];
-    const lines = ['Information about this level:', ''];
-    if (L.items.some(i => i.kind === 3)) lines.push('- Find the EXIT-CARD');
-    const reqSpr = new Set(L.items.filter(i => i.kind === 0).map(i => i.spr));
-    if ([...reqSpr].some(s => s === 80 || s === 88)) lines.push('- Find all drink-boxes');
-    if ([...reqSpr].some(s => s === 89 || (s >= 81 && s <= 83))) lines.push('- Find all Lollypops');
-    if (L.items.some(i => i.kind === 2)) {
-      lines.push('', 'Respect the mystical stones!');
+    st.levelNo = n;
+    st.level = L;
+    st.map = L.map.slice();
+    st.tick = 0; st.iter = 0;
+    st.result = null;
+
+    // items: cards (kind 2) sit inside a solid blank "mystical stone"
+    st.items = L.items.map(it => ({ ...it, state: 1 }));
+    for (const it of st.items) {
+      if (it.kind === 2) st.map[(it.y >> 4) * 40 + (it.x >> 4)] = 0x40;
     }
-    lines.push('', 'Have a good time!', '', '> Press any key <');
-    st.mode = 'info';
-    st.infoLines = lines;
-    Input.onAnyKey(() => { enterLevel(n); st.mode = 'play'; });
+    st.keys = { 81: false, 82: false, 83: false };
+    st.deco = L.deco;
+
+    st.enemies = L.enemies.map(e => {
+      const [w, h] = spriteSize(e.prog[1] !== undefined ? e.prog[1] : 31);
+      return {
+        x: e.x, y: e.y, vx: e.x, vy: e.y, vpx: e.x, vpy: e.y, dx: 0, dy: 0,
+        speed: e.speed, minx: e.minx, maxx: e.maxx, miny: e.miny, maxy: e.maxy,
+        dir: e.dir, kind: e.kind, hp: e.hp, hits: e.hp, reset: e.reset,
+        prog: e.prog, animIdx: 0, animT: 0, phase: 0, bdir: 0, rdir: 0,
+        cool: 0, dead: false, active: false, w, h,
+        sprite: e.prog[1] !== undefined ? e.prog[1] : 31,
+      };
+    });
+
+    st.w = {
+      x: L.wx, y: L.wy, px: L.wx, py: L.wy,
+      frame: L.face,                // 0 = facing left, 12 = facing right
+      hst: 2, lst: 2,               // right / left state machines
+      vst: 2,                       // vertical: 0 reset,1 start fall,2 idle,3 falling
+      jst: 2, jphase: 0, jy0: 0,    // jump: 0 reset,1 start,2 idle,3 jumping
+      held: false,                  // jump key held (auto-rejump)
+      slowR: false, slowL: false,   // half-step toggles near walls
+      ride: 2, rideIdx: -1,         // 2 normal, 1 just landed on platform, 3 riding, 0 leaving
+      alive: 2,                     // 2 alive, 1 just died, 3 dying, 0 done
+      deathFrame: 0, deathX: 0,
+      frozenX: 0,
+    };
+    st.shot = { state: 2, dir: 1, x: 0, y: 0, age: 0, spr: 27, anim: 0 };
+    st.expl = { state: 2, x: 0, y: 0, frame: 22 };
+    st.energy = 4; st.inv = 0;
+    st.card = false;
+    st.needed = L.need;
+    st.stats = { shots: 0, kills: 0 };
+
+    st.cam.x = clamp(L.scx, 0, WORLD_W - VW);
+    st.cam.y = clamp(L.scy, 0, WORLD_H - VH);
+    if (n === 0 && st.hubReturn) {
+      st.w.x = st.w.px = st.hubReturn.x;
+      st.w.y = st.w.py = st.hubReturn.y;
+      st.cam.x = st.hubReturn.cx;
+      st.cam.y = st.hubReturn.cy;
+    }
+    fixCamera();
+    st.cam.px = st.cam.x; st.cam.py = st.cam.y;
+    Renderer.initBackdrop(n + 7);
+    Renderer.clearParticles();
+    Audio2.music(n === 0 ? 'hub' : 'level');
   }
 
-  function onItem(it) {
-    const sprite = it.spr;
-    if (it.kind === 3) {                     // exit card
-      st.card = true;
-      Audio2.play('card');
-      Renderer.burst(it.x + 8, it.y + 8, '#6aff8a', 20, 130);
-    } else if (it.kind === 2) {              // removes a mystical stone
-      const c = Math.floor(it.x / 16), r = Math.floor(it.y / 16);
-      const i = r * 40 + c;
-      if ((st.map[i] >> 6) === 1) st.map[i] -= 0x40;
-      Audio2.play('wall');
-      Renderer.burst(it.x + 8, it.y + 8, '#b09aff', 16, 110);
-      st.score += 50;
-    } else if (it.kind === 0) {              // required collectible
-      st.needed = Math.max(0, st.needed - 1);
-      st.score += 25;
-      Audio2.play('pickup');
-      Renderer.burst(it.x + 8, it.y + 8, '#ff9ad5', 12, 100);
-    } else {                                 // bonus
-      st.score += 75;
-      Audio2.play('pickup');
-      Renderer.burst(it.x + 8, it.y + 8, '#ffe27a', 12, 100);
+  // -------------------------------------------------------------- input
+  function applyInput() {
+    const w = st.w;
+    for (const ev of Input.take()) {
+      if (ev.down && w.alive !== 2) continue;
+      switch (ev.k) {
+        case 'right':
+          if (ev.down) { if (w.hst === 2) w.hst = 1; } else w.hst = 0;
+          break;
+        case 'left':
+          if (ev.down) { if (w.lst === 2) w.lst = 1; } else w.lst = 0;
+          break;
+        case 'jump':
+          if (ev.down) { w.held = true; if (w.jst === 2) w.jst = 1; }
+          else w.held = false;
+          break;
+        case 'shot':
+          if (ev.down && st.shot.state === 2) st.shot.state = 1;
+          break;
+      }
     }
-    updateHud();
   }
 
-  function tickEnemies() {
-    for (const e of st.enemies) {
-      if (!e.alive) continue;
-      // movement: patrol inside bounds
-      if (e.dx) {
-        e.px += (e.dx / 15) * e.dirx;
-        if (e.px <= e.minx) { e.px = e.minx; e.dirx = 1; }
-        if (e.px >= e.maxx) { e.px = e.maxx; e.dirx = -1; }
+  // -------------------------------------------------------------- Willy
+  function willyStep() {
+    const w = st.w;
+    let ty0 = w.y >> 4, ty1 = (w.y + 15) >> 4, ty2 = (w.y + 16) >> 4;
+
+    // --- horizontal, right
+    if (w.hst === 3) {
+      const cf = (w.x + 14) >> 4, cs = (w.x + 12) >> 4;
+      if (!solid(ty0, cf) && !solid(ty1, cf) && !w.slowR) {
+        w.x += 2;
+        w.frame++;
+        if (w.frame > 23 || w.frame < 12) w.frame = 12;
+      } else if (!solid(ty0, cs) && !solid(ty1, cs)) {
+        w.x += 2;
+        w.frame = 12;
+        w.slowR = !w.slowR;
       }
-      if (e.dy) {
-        e.py += (e.dy / 15) * e.diry;
-        if (e.py <= e.miny) { e.py = e.miny; e.diry = 1; }
-        if (e.py >= e.maxy) { e.py = e.maxy; e.diry = -1; }
+    }
+    if (w.hst === 1) {
+      const c = (w.x + 12) >> 4;
+      if (!solid(ty0, c) && !solid(ty1, c)) {
+        w.hst = 3; w.x += 2; w.lst = 2;
       }
-      // animation program: [duration, sprite] pairs, looped
-      if (e.prog.length) {
-        e.progT++;
-        if (e.progT >= e.prog[e.progIdx][0]) {
-          e.progT = 0;
-          e.progIdx = (e.progIdx + 1) % e.prog.length;
-          e.sprite = e.prog[e.progIdx][1];
+    }
+    if (w.hst === 0) { w.hst = 2; w.frame = 12; }
+
+    // --- horizontal, left
+    if (w.lst === 3) {
+      const cf = (w.x - 4) >> 4, cs = (w.x - 2) >> 4;
+      if (!solid(ty0, cf) && !solid(ty1, cf) && !w.slowL) {
+        w.x -= 2;
+        w.frame = (w.frame + 1) % 12;
+      } else if (!solid(ty0, cs) && !solid(ty1, cs)) {
+        w.x -= 2;
+        w.frame = 0;
+        w.slowL = !w.slowL;
+      }
+    }
+    if (w.lst === 1) {
+      const c = (w.x - 2) >> 4;
+      if (!solid(ty0, c) && !solid(ty1, c)) {
+        w.x -= 2; w.lst = 3;
+        if (w.hst === 3) w.hst = 2;
+      }
+    }
+    if (w.lst === 0) { w.lst = 2; w.frame = 0; }
+
+    const tx0 = w.x >> 4, tx1 = (w.x + 15) >> 4, fx = w.x & 15;
+    // "ground" test used by the original: tile under the left foot must be
+    // free and (tile under the right foot free or Willy is in the left part
+    // of his tile)
+    const freeRow = (r) => attr(r, tx0) === A_FREE && (attr(r, tx1) === A_FREE || fx < 5);
+
+    // --- vertical (falling)
+    if (w.vst === 0) w.vst = 2;
+    if (w.vst === 2 && w.ride === 2) {
+      if (freeRow(ty2) && w.jst !== 3) w.vst = 1;
+    }
+    if (w.vst === 3) {
+      if (freeRow((w.y + 21) >> 4)) w.y += 6;
+      else if (freeRow((w.y + 19) >> 4)) w.y += 4;
+      else if (freeRow((w.y + 17) >> 4)) w.y += 2;
+      else { w.vst = 0; w.y = (w.y >> 4) << 4; }
+    }
+    if (w.vst === 1) { w.y += 2; w.vst = 3; }
+
+    // --- jump
+    if (w.jst === 3) {
+      if (w.jphase < 18) {
+        w.y = w.jy0 - JT[w.jphase];
+        ty0 = w.y >> 4;
+        const bump = solid(ty0, tx0) || (solid(ty0, tx1) && fx > 5) || w.y < 16;
+        if (bump) {
+          w.jphase = 35 - w.jphase;
+          w.y = ((w.y >> 4) << 4) + 16;
+        }
+      } else {
+        const i = 35 - w.jphase;
+        w.y = w.jy0 - (i >= 0 ? JT[i] : 0);
+        ty1 = (w.y + 15) >> 4;
+        const land = attr(ty1, tx0) !== A_FREE || (attr(ty1, tx1) !== A_FREE && fx > 5);
+        if (land) {
+          w.jphase = 36;
+          w.y = (w.y >> 4) << 4;
+        }
+      }
+      w.jphase++;
+    }
+    if (w.jst === 1) {
+      const r = ty0 - 1;
+      if (w.vst !== 3 && w.alive === 2 &&
+          !solid(r, tx0) && !(solid(r, tx1) && fx >= 5)) {
+        w.jst = 3; w.jy0 = w.y; w.jphase = 0;
+      } else {
+        w.jst = 2; w.held = false;
+      }
+    }
+    if (w.jst === 0) w.jst = 2;
+    if (w.jphase === 37) {
+      w.jst = 0; w.jphase = 0;
+      if (attr((w.y + 18) >> 4, tx0) === A_FREE && fx < 5) { w.y += 2; w.vst = 3; }
+    }
+    if (w.jst === 2 && w.held && w.vst === 2 && w.alive === 2) w.jst = 1;
+
+    // --- animation frames while airborne
+    if ((w.jst === 3 || w.vst === 3) && w.hst === 3) w.frame = 25;
+    if ((w.jst === 3 || w.vst === 3) && w.lst === 3) w.frame = 24;
+    if (w.jst === 3 && w.hst === 2 && w.lst === 2 && w.frame < 24) {
+      w.frame = w.frame < 12 ? 24 : 25;
+    }
+
+    // --- shot / explosion state machines
+    const sh = st.shot, ex = st.expl;
+    if (sh.state === 0) sh.state = 2;
+    if (ex.state === 0) { ex.state = 2; ex.x = 0; }
+    if (ex.state === 3 && ex.frame === 26) ex.state = 0;
+    if (ex.state === 1) {
+      Audio2.play('explosion');
+      ex.state = 3; ex.frame = 22; ex.t = 0;
+      ex.y = sh.y - 5;
+      if (ex.x === 0) ex.x = sh.dir === 1 ? sh.x + 6 : sh.x - 4;
+      Renderer.burst(ex.x + 8, ex.y + 8, ['#ffd257', '#ff7b3a', '#fff2a0'], 10, 60);
+    }
+    if (sh.state === 3) {
+      if (sh.x < st.cam.x || sh.x > st.cam.x + VW) sh.state = 0;   // left the screen
+      if (sh.dir === 0) {
+        if (solid(sh.y >> 4, (sh.x - 4) >> 4)) { sh.state = 0; ex.state = 1; }
+        else { sh.age++; sh.x -= sh.age > 8 ? 6 : 4; }
+      } else {
+        if (solid(sh.y >> 4, (sh.x + 16) >> 4)) { sh.state = 0; ex.state = 1; }
+        else { sh.age++; sh.x += sh.age > 8 ? 6 : 4; }
+      }
+      if (sh.x < 4 || sh.x > 619) { sh.state = 0; ex.state = 1; }
+    }
+    if (sh.state === 1 && w.alive === 2 && ex.state === 2) {
+      const facingLeft = w.frame < 12 || w.frame === 24 || w.frame === 32;
+      if (facingLeft) {
+        if (solid((w.y + 8) >> 4, (w.x - 8) >> 4)) sh.state = 2;
+        else {
+          sh.dir = 0; sh.spr = 29; w.frame = 32;
+          sh.x = w.x - 14; sh.y = w.y + 4; sh.state = 3; sh.age = 0;
+          st.stats.shots++;
+          Audio2.play('shoot');
+        }
+      } else {
+        if (solid((w.y + 8) >> 4, (w.x + 22) >> 4)) sh.state = 2;
+        else {
+          sh.dir = 1; sh.spr = 27; w.frame = 31;
+          sh.x = w.x + 12; sh.y = w.y + 4; sh.state = 3; sh.age = 0;
+          st.stats.shots++;
+          Audio2.play('shoot');
         }
       }
     }
+
+    // --- riding on a platform enemy
+    if (w.ride === 0) w.ride = 2;
+    if (w.ride === 3 && w.jst === 3) w.ride = 0;
+    if (w.ride === 3 && (w.hst === 3 || w.lst === 3)) {
+      const e = st.enemies[w.rideIdx];
+      if (!e || Math.abs(w.x - e.x) > 10) w.ride = 0;
+    }
+    if (w.ride === 3 || w.ride === 1) {
+      const e = st.enemies[w.rideIdx];
+      if (e) {
+        w.y = e.y - 16;
+        if (e.dir === 0 || e.dir === 1 || e.dir === 7) w.x += e.dx / 2;
+        if (w.ride === 1) {
+          w.ride = 3; w.vst = 2; w.jst = 2; w.hst = 2; w.lst = 2;
+        }
+      } else {
+        w.ride = 2;
+      }
+    }
+
+    // --- world bounds
+    if (w.x < 2) { w.x = 2; w.lst = 2; }
+    if (w.x > 622) { w.x = 622; w.hst = 2; }
+    if (w.y > WORLD_H - 16) w.y = WORLD_H - 16;
+
+    // --- frame fixes when standing still
+    if (w.lst === 2 && w.hst === 2) {
+      if (w.frame < 12 && w.jst !== 3) w.frame = 0;
+      if (w.frame > 12 && w.frame < 23) w.frame = 12;
+      if (w.frame > 23 && w.jst !== 3) {
+        if (w.frame === 24) w.frame = 0;
+        if (w.frame === 25) w.frame = 12;
+      }
+    }
+
+    // --- death animation (frames 26..30) overrides everything
+    if (w.alive === 1) {
+      w.deathFrame = 26; w.deathX = w.x; w.alive = 3; w.frame = 26;
+    }
+    if (w.alive === 3) {
+      w.x = w.deathX;
+      if (st.tick % 4 === 0) w.deathFrame++;
+      w.frame = Math.min(w.deathFrame, 30);
+      if (w.deathFrame >= 40) w.alive = 0;
+    }
+
+    // --- shot sprite animation
+    if (sh.state === 3 && st.tick % 3 === 0) {
+      sh.spr++;
+      if (sh.spr === 29 && sh.dir === 1) sh.spr = 27;
+      if (sh.spr === 31) sh.spr = 29;
+    }
+    if (ex.state === 3) {
+      ex.t++;
+      if (ex.t % 4 === 0) ex.frame++;
+    }
   }
 
-  function updateCamera(dt) {
-    const target = {
-      x: clamp(st.wx + 12 - Renderer.VW / 2, 0, 640 - Renderer.VW),
-      y: clamp(st.wy + 8 - Renderer.VH / 2, 0, 384 - Renderer.VH),
-    };
-    const k = 1 - Math.pow(0.0025, dt);
-    st.cam.x += (target.x - st.cam.x) * k;
-    st.cam.y += (target.y - st.cam.y) * k;
+  // ------------------------------------------------------------- camera
+  function fixCamera() {
+    const w = st.w;
+    if (w.y < st.cam.y + 80) st.cam.y = w.y - 80;
+    if (w.y > st.cam.y + 120) st.cam.y = w.y - 120;
+    st.cam.y = clamp(st.cam.y, 0, WORLD_H - VH);
+    if (w.x < st.cam.x + 80) st.cam.x = w.x - 80;
+    if (w.x > st.cam.x + 240) st.cam.x = w.x - 240;
+    st.cam.x = clamp(st.cam.x, 0, WORLD_W - VW);
+  }
+
+  // -------------------------------------------------------------- items
+  function itemsStep() {
+    const w = st.w;
+    for (const it of st.items) {
+      if (it.state !== 1) continue;
+      if (Math.abs(it.x - w.x) > 16 || Math.abs(it.y - w.y) > 16) continue;
+      if (it.kind === 0) {
+        it.state = 2;
+        Audio2.play('pickup');
+        if (it.spr === 80 || it.spr === 88 || it.spr === 89) st.needed--;
+        Renderer.burst(it.x + 12, it.y + 8, ['#ff9ad5', '#ffffff'], 8, 50);
+        continue;
+      }
+      switch (it.spr) {
+        case 81: case 82: case 83:            // keys
+          it.state = 2; st.keys[it.spr] = true;
+          Audio2.play('pickup');
+          Renderer.burst(it.x + 12, it.y + 8, ['#ffe27a', '#ffffff'], 8, 50);
+          break;
+        case 84: case 85: case 86:            // cards: need the matching key
+          if (!st.keys[it.spr - 3]) break;
+          it.state = 2;
+          Audio2.play('card');
+          st.map[(it.y >> 4) * 40 + (it.x >> 4)] -= 0x40;   // stone becomes passable
+          Renderer.burst(it.x + 12, it.y + 8, ['#b09aff', '#ffffff', '#8cf'], 14, 70);
+          break;
+        case 87:                              // exit card
+          it.state = 2; st.card = true;
+          Audio2.play('pickup');
+          Renderer.burst(it.x + 12, it.y + 8, ['#6aff8a', '#ffffff'], 12, 60);
+          break;
+        default:
+          it.state = 2;
+          Audio2.play('pickup');
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ enemies
+  function enemyActive(e) {
+    return e.maxx + 16 > st.cam.x && e.minx < st.cam.x + 336 &&
+           e.maxy + 16 > st.cam.y && e.miny < st.cam.y + 216;
+  }
+
+  function enemiesStep() {
+    const w = st.w;
+    for (const e of st.enemies) {
+      e.vpx = e.vx; e.vpy = e.vy; e.dx = 0; e.dy = 0;
+      if (e.dead) continue;
+      e.active = enemyActive(e);
+      if (!e.active) continue;
+
+      // animation program: [duration, sprite] pairs
+      const P = e.prog;
+      if (e.animT === P[e.animIdx]) { e.animIdx += 2; e.animT = 0; }
+      if (e.animIdx >= P.length || P[e.animIdx] === 0xfe) { e.animIdx = 0; e.animT = 0; }
+      if (P[e.animIdx] === 0xff) { e.animIdx = e.reset; e.animT = 0; }
+      if (e.animIdx + 1 < P.length && P[e.animIdx + 1] !== e.sprite) {
+        e.sprite = P[e.animIdx + 1];
+        [e.w, e.h] = spriteSize(e.sprite);
+      }
+
+      const sp = e.speed;
+      const slow = sp >= 100;
+      const step = slow ? 0 : 2 * sp;
+      const slowStep = slow && (st.iter % (sp - 100) === 1) ? 1 : 0;
+      const ox = e.x, oy = e.y;
+
+      switch (e.dir) {
+        case 0:   // right
+          if (e.x + (slow ? 0 : sp) > e.maxx) {
+            e.x = e.maxx; e.dir = 1;
+            if (e.reset !== 0) { e.animIdx = 0; e.animT = 0; }
+          } else e.x += slow ? slowStep : step;
+          break;
+        case 1:   // left
+          if (e.x - (slow ? 0 : sp) < e.minx) {
+            e.x = e.minx; e.dir = 0;
+            if (e.reset !== 0) { e.animIdx = e.reset; e.animT = 0; }
+          } else e.x -= slow ? slowStep : step;
+          break;
+        case 2:   // up
+          if (e.y - sp < e.miny) { e.y = e.miny; e.dir = 3; }
+          else e.y -= step;
+          break;
+        case 3:   // down
+          if (e.y + sp > e.maxy) { e.y = e.maxy; e.dir = 2; }
+          else e.y += step;
+          break;
+        case 4:   // parabolic arc between minx and minx + 70*speed
+        case 5: { // vertical bounce
+          if (e.dir === 4) {
+            const k = e.bdir === 0 ? e.phase : 35 - e.phase;
+            e.x = e.minx + k * sp * 2;
+          }
+          const i = e.phase < 18 ? e.phase : 35 - e.phase;
+          e.y = e.maxy - (i >= 0 ? JT[i] : 0) * sp;
+          e.phase = (e.phase + 1) % 37;
+          if (e.phase === 0) e.bdir ^= 1;
+          break;
+        }
+        case 6: { // random walker
+          if (Math.floor(Math.random() * 20) === 1) e.rdir = Math.floor(Math.random() * 4);
+          let dxp = 0, dyp = 0;
+          const mv = (d) => {
+            if (d === 0) e.x += step; else if (d === 1) e.y += step;
+            else if (d === 2) e.x -= step; else e.y -= step;
+          };
+          mv(e.rdir);
+          if (e.rdir === 0) { dxp = e.w + 2; if (e.x + dxp > e.maxx) e.rdir = 2; }
+          else if (e.rdir === 1) { dyp = e.h + 2; if (e.y + dyp > e.maxy) e.rdir = 3; }
+          else if (e.rdir === 2) { dxp = -2; if (e.x - 2 < e.minx) e.rdir = 0; }
+          else { dyp = -2; if (e.y - 2 < e.miny) e.rdir = 1; }
+          if (attr((e.y + dyp) >> 4, (e.x + dxp) >> 4) !== A_FREE) {
+            const sx = e.x, sy = e.y;
+            let tries = 0;
+            do {
+              tries++;
+              e.rdir = (e.rdir + 1) % 4;
+              e.x = sx; e.y = sy;
+              mv(e.rdir);
+            } while (solid(e.y >> 4, e.x >> 4) && tries < 6);
+          }
+          break;
+        }
+        case 7:   // homing
+          if (e.x < w.x) e.x += sp;
+          if (e.x > w.x) e.x -= sp;
+          if (e.y < w.y) e.y += sp;
+          if (e.y > w.y) e.y -= sp;
+          break;
+      }
+      e.dx = e.x - ox; e.dy = e.y - oy;
+      e.vx = e.x; e.vy = e.y;
+      e.animT++;
+      if (e.cool > 0) e.cool--;
+    }
+  }
+
+  /** odd frames: the original's second video page shows the enemy half a
+   *  step ahead (smooth motion for the linear movers) */
+  function enemiesInterpolate() {
+    for (const e of st.enemies) {
+      e.vpx = e.vx; e.vpy = e.vy;
+      if (!e.active || e.dead) continue;
+      if (e.dir <= 3 || e.dir === 7) { e.vx = e.x + e.dx / 2; e.vy = e.y + e.dy / 2; }
+    }
+  }
+
+  // ------------------------------------------------------- collisions
+  function hurt() {
+    if (st.inv === 0) { st.energy--; st.inv = 16; }
+    Audio2.play('hurt');
+    if (st.energy <= 0) die();
   }
 
   function die() {
-    if (st.mode !== 'play') return;
-    st.mode = 'dying';
-    st.fadeT = 0;
-    st.lives--;
-    Audio2.play('die');
-    Renderer.burst(st.wx + 12, st.wy + 8, '#ff6a5a', 26, 150);
-    updateHud();
+    const w = st.w;
+    if (w.alive !== 2) return;
+    st.inv = 0;
+    w.alive = 1;
+    if (w.hst !== 2) w.hst = 0;
+    if (w.lst !== 2) w.lst = 0;
+    Audio2.play('death');
+    Renderer.burst(w.x + 8, w.y + 8, ['#ff6a5a', '#ffd257', '#ffffff'], 18, 90);
   }
 
-  function completeLevel() {
-    st.mode = 'complete';
-    st.fadeT = 0;
-    st.doorsDone[st.levelNo] = true;
-    st.score += 500;
-    saveProgress();
-    Audio2.play('win');
-    Audio2.stopMusic();
-  }
-
-  // ------------------------------------------------------------------ HUD
-  function updateHud() {
-    const lvl = document.getElementById('hud-level');
-    const items = document.getElementById('hud-items');
-    const card = document.getElementById('hud-card');
-    const lives = document.getElementById('hud-lives');
-    if (st.mode === 'boot' || st.mode === 'title' || st.mode === 'menu') {
-      lvl.textContent = ''; items.textContent = '';
-      card.textContent = ''; lives.textContent = '';
-      return;
+  function collisionsStep() {
+    const w = st.w;
+    if (w.alive !== 2) return;
+    for (const e of st.enemies) {
+      if (!e.active || e.dead || e.kind !== 0) continue;
+      const ew = e.w, eh = e.h;
+      const ox = e.x < w.x ? (e.x + ew > w.x + 10)
+                           : (e.x < w.x + 14 && e.x + ew > w.x + 16);
+      if (!ox) continue;
+      const oy = e.y < w.y ? (e.y + eh > w.y) : (e.y < w.y + 16 && e.y + eh > w.y);
+      if (!oy) continue;
+      hurt();
+      if (w.alive !== 2) return;
     }
-    lvl.textContent = st.levelNo === 0
-      ? `Galactic Train — ${Object.keys(st.doorsDone).length}/24`
-      : `Level ${st.levelNo}`;
-    if (st.levelNo !== 0 && (st.needed > 0 || st.level.need > 0)) {
-      const drinks = st.level.items.some(i => i.kind === 0 && (i.spr === 80 || i.spr === 88));
-      items.textContent = `${drinks ? '🥤' : '🍭'} ${st.needed}`;
+    if (st.inv > 0) st.inv--;
+    // deadly tile under the feet
+    if (attr((w.y + 18) >> 4, (w.x + 8) >> 4) === A_DEADLY) {
+      Audio2.play('hurt');
+      die();
+    }
+  }
+
+  function rideStep() {
+    const w = st.w;
+    if (w.ride !== 2 || w.alive !== 2) return;
+    const descending = w.vst !== 2 || (w.jst === 3 && w.jphase > 18);
+    st.enemies.forEach((e, i) => {
+      if (!e.active || e.dead) return;
+      if (e.kind === 1) {
+        if (Math.abs(w.x - e.x) < 10 && Math.abs(w.y - e.y + 16) < 10 && descending) {
+          w.ride = 1; w.rideIdx = i;
+        }
+      } else if (e.kind === 2) {
+        if (Math.abs(w.x - e.x) < 10 && Math.abs(w.y - e.y + 60) < 5 &&
+            (w.vst === 3 || (w.jst === 3 && w.jphase > 18))) {
+          e.animIdx = e.reset; e.animT = 0;
+        }
+        if (Math.abs(w.x - e.x) < 10 && Math.abs(w.y - e.y + 16) < 20 &&
+            (w.vst === 3 || (w.jst === 3 && w.jphase > 18))) {
+          w.ride = 1; w.rideIdx = i;
+          hurt();
+        }
+      }
+    });
+  }
+
+  function shotVsEnemies() {
+    const sh = st.shot;
+    if (sh.state !== 3) return;
+    for (const e of st.enemies) {
+      if (!e.active || e.dead || e.kind !== 0) continue;
+      const ox = e.x < sh.x ? (e.x + e.w > sh.x) : (e.x < sh.x + 16 && e.x + e.w > sh.x + 16);
+      if (!ox) continue;
+      const oy = e.y < sh.y ? (e.y + e.h > sh.y) : (e.y < sh.y + 7 && e.y + e.h > sh.y + 7);
+      if (!oy) continue;
+      if (e.cool === 0 && e.hp !== 0xff) {
+        e.hits = (e.hits - 1) & 0xff;
+        e.cool = 40;
+      }
+      Audio2.play('enemyhit');
+      sh.state = 0;
+      if (e.hits === 0 && e.hp !== 0xff) {
+        e.cool = 1;
+        st.expl.x = e.x + 2;
+        st.expl.state = 1;
+        e.dead = true;
+        st.stats.kills++;
+        Renderer.burst(e.x + e.w / 2, e.y + e.h / 2, ['#ffd257', '#ff7b3a', '#ffffff'], 16, 90);
+      }
+      break;
+    }
+  }
+
+  // --------------------------------------------------------- exit/doors
+  function exitCheck() {
+    const w = st.w, L = st.level;
+    if (st.levelNo === 0 || w.alive !== 2) return;
+    const dx = (w.x + 4 - L.exx) & 0xffff, dy = (w.y - L.exy) & 0xffff;
+    if (dx < 16 && dy < 32 && st.card && st.needed === 0) {
+      st.result = 'complete';
+    }
+  }
+
+  function doorCheck() {
+    const w = st.w;
+    if (st.levelNo !== 0 || w.alive !== 2) return;
+    for (const d of st.level.doors) {
+      if (st.doorsDone[d.level]) continue;
+      const dy = (w.y - d.y) & 0xffff;
+      if (Math.abs(w.x - 4 - d.x) < 18 && dy < 24) {
+        let rx = d.x < w.x ? d.x + 22 : d.x - 18;
+        if (rx > 624) rx = d.x + 22;
+        st.hubReturn = { x: rx, y: d.y + 12, cx: st.cam.x, cy: st.cam.y };
+        st.lastDoor = d.level;
+        st.result = { door: d.level };
+        return;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- tick
+  function tick() {
+    const w = st.w;
+    w.px = w.x; w.py = w.y;
+    st.cam.px = st.cam.x; st.cam.py = st.cam.y;
+    st.time += TICK;
+
+    applyInput();
+    willyStep();
+    itemsStep();
+    if (st.tick % 2 === 0) {
+      collisionsStep();
+      shotVsEnemies();
+      rideStep();
+      enemiesStep();
     } else {
-      items.textContent = '';
+      enemiesInterpolate();
+      st.iter++;
     }
-    card.textContent = st.levelNo !== 0 && st.cardNeeded
-      ? (st.card ? '💳 ✓' : '💳 ?') : '';
-    lives.textContent = '❤'.repeat(Math.max(0, st.lives));
+    fixCamera();
+    exitCheck();
+    doorCheck();
+    if (w.alive === 0) st.result = 'dead';
+    st.tick++;
   }
 
-  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-
-  return { st, enterLevel, updatePlay, showLevelInfo, resolveSprite,
-           saveProgress, loadProgress, updateHud, die,
-           clamp };
+  return { st, TICK, TICK_HZ, VW, VH, WORLD_W, WORLD_H,
+           init, enterLevel, tick, saveProgress, loadProgress,
+           doorsDoneCount, allDoneExcept, clamp, WF: () => WF };
 })();

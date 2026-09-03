@@ -9,28 +9,17 @@
 </head>
 <body>
 <div id="stage">
-  <canvas id="game" width="1280" height="800"></canvas>
-  <div id="hud">
-    <div class="hud-left">
-      <span id="hud-level"></span>
-    </div>
-    <div class="hud-right">
-      <span id="hud-items"></span>
-      <span id="hud-card"></span>
-      <span id="hud-lives"></span>
-      <button id="btn-sound" title="Sound on/off">🔊</button>
-      <button id="btn-full" title="Fullscreen">⛶</button>
-    </div>
-  </div>
+  <canvas id="game" width="320" height="200"></canvas>
   <div id="touch-controls">
     <div class="tc-left">
-      <button data-k="left">◀</button><button data-k="right">▶</button>
+      <button data-k="left" aria-label="left">&#9664;</button><button data-k="right" aria-label="right">&#9654;</button>
     </div>
     <div class="tc-right">
-      <button data-k="jump">▲</button><button data-k="shot">✦</button>
+      <button data-k="shot" aria-label="shoot">&#10022;</button><button data-k="jump" aria-label="jump">&#9650;</button>
     </div>
   </div>
 </div>
+<script src="js/font.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/input.js"></script>
 <script src="js/assets.js"></script>

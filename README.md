@@ -1,14 +1,16 @@
-# Little Willy — "Where is mama?" (Browser Remake)
+# Little Willy — "Where is mama?" (Browser-Remake)
 
 Browser-Remake des DOS-Spiels **Little Willy v1.1** (© 1993/1994
-I. Mustun / Dimension 16 & M.B. Soft) — mit den originalen Levels und
-identischem Gameplay, aber zeitgemässer Grafik (4×-Upscaling, Parallax,
-Partikel, Glow, sanftes Scrolling) und neuem Sound (WebAudio-Synthesizer,
-Musik + Effekte).
+I. Mustun / Dimension 16 & M.B. Soft) mit den originalen Levels und der
+originalen Spielmechanik. Die komplette Logik (Laufen, Springen, Fallen,
+Gegner, Items, Schuss, Energie) wurde aus der `LW5.EXE` rekonstruiert
+und läuft wie im Original mit 35 Logikbildern pro Sekunde auf einer
+Welt aus 16x16-Kacheln. Die Grafik wird in der nativen Auflösung
+320x200 gezeichnet und ganzzahlig, pixelgenau skaliert.
 
 ## Spielen
 
-Einfach einen statischen Webserver im Projektordner starten, z. B.:
+Einen statischen Webserver im Projektordner starten, z. B.:
 
 ```bash
 python3 -m http.server 8000
@@ -20,28 +22,36 @@ weil das Spiel seine Daten per `fetch` lädt.)
 
 ## Steuerung (wie im Original)
 
-| Taste                  | Aktion                  |
-|------------------------|-------------------------|
-| `A` / `Space` / `↑`    | Springen / Tür betreten |
-| `S` / `Ctrl` / `X`     | Schiessen               |
-| `,` / `←`              | Nach links              |
-| `.` / `→`              | Nach rechts             |
-| `Esc`                  | Menü                    |
+| Taste                  | Aktion                        |
+|------------------------|-------------------------------|
+| `A` / `Space` / `↑`    | Springen (gehalten: Dauersprung) |
+| `S` / `Ctrl` / `X`     | Schiessen                     |
+| `,` / `←`              | Nach links                    |
+| `.` / `→`              | Nach rechts                   |
+| `Esc`                  | Menü / Pause                  |
+| `M` / `O` / `F`        | Musik, Effekte, Vollbild      |
 
-Auf Touch-Geräten werden Bildschirm-Buttons eingeblendet.
+Gamepads werden unterstützt, auf Touch-Geräten erscheinen
+Bildschirmtasten.
 
 ## Das Spiel
 
-Willys Mutter wurde entführt! Vom **Galactic Train** aus — einem
-Labyrinth aus Mondsteinen — führen 24 Türen in 24 Welten. In jedem Level:
+Willys Mutter wurde entführt. Vom **Galactic Train**, einem Labyrinth
+aus Mondsteinen, führen 24 Türen in 24 Welten. Eine Tür betritt man,
+indem man hineinläuft. In jedem Level:
 
-- Finde die **EXIT-CARD**, um den Ausgang zu öffnen
-- Sammle alle **Drink-Boxes** bzw. **Lollypops**
-- Respektiere die **mystischen Steine** (unsichtbare Wände — manche
-  Karten-Items entfernen sie!)
-- Weiche Gegnern aus oder schiesse sie ab
+- Finde die **EXIT-CARD**, sonst bleibt der Ausgang zu.
+- Sammle alle **Drink-Boxes** bzw. **Lollypops** (Zähler oben rechts).
+- Die farbigen **Karten** stecken in unsichtbaren Steinen und lassen
+  sich nur mit dem passenden **Schlüssel** nehmen; danach ist der Stein
+  weg.
+- Willy hat pro Level **vier Energiepunkte** (Herzen). Sind sie weg oder
+  berührt er ein tödliches Feld, beginnt das Level von vorn.
+- Gegner lassen sich abschiessen; manche brauchen mehrere Treffer,
+  manche sind unverwundbar. Auf Plattformen und Aufzügen kann Willy
+  mitfahren.
 
-Erst wenn alle 24 Level geschafft sind, öffnet sich Tür 1: das
+Erst wenn alle anderen Türen geschafft sind, öffnet sich Tür 1: das
 Gefängnis, in dem Mama festgehalten wird.
 
 Der Spielfortschritt (geschaffte Türen) wird automatisch im Browser
@@ -51,32 +61,48 @@ gespeichert (`localStorage`).
 
 ```
 original/     Original-DOS-Dateien (LEV/SPR/BST/DAT + LW5.EXE)
-tools/        extract.py — dekodiert die Originalformate und erzeugt
-              die Assets (JSON + 4×-hochskalierte PNGs)
+tools/        extract.py: dekodiert die Originalformate und erzeugt die
+              Assets (JSON + PNG in Originalauflösung)
+              font.py: erzeugt die 5x7-Bitmap-Schrift (js/font.js)
 assets/       generierte Spieldaten und Grafiken
-js/           Engine (Physik, Gegner, Items, Rendering, Audio, Input)
+js/           Engine: game.js (Simulation), render.js, audio.js,
+              input.js, assets.js, font.js, main.js (Ablauf)
 index.html    Einstieg
 ```
 
-### Reverse-engineerte Formate (Kurzfassung)
+## Rekonstruierte Mechanik (Auszug aus LW5.EXE)
 
-- **.LEV** — 40×24-Tilemap (1 Byte je Zelle: Bits 6–7 = Attribut:
-  0 passierbar, 1 solide, 3 tödlich; Bits 0–5 = Tile-Index), danach
-  Gegnerliste (Patrouillen-Grenzen + Animationsprogramm), Items
-  (x, y, Sprite, Art), Deko-Sprites und Startwerte (Willy-Position,
-  Scroll, Exit-Position, Anzahl Pflicht-Items).
-- **.BST** — 16×16-Tiles, 4 EGA-Bitplanes, 128 Bytes pro Tile.
-- **.SPR** — je Sprite `[Breite in Bytes][Höhe]`, dann 4 vorverschobene
-  Kopien × 5 Bitplanes (B, G, R, I + Transparenz-Maske).
-- **.DAT** — 16-Farben-BMPs (teils mit gepatchter Magic).
-- Die 24 Türen im Hub ergeben sich aus dem zeilenweisen Scan der
-  LMAIN-Karte nach Tür-Tiles; Tür *n* → Level *n*. Tür 1 ist das Finale.
+- **Zeitbasis**: ein Seitenwechsel je 25 ms BIOS-Timer plus
+  Bildsynchronisation, also 35 Logikbilder pro Sekunde.
+- **Laufen**: 2 px pro Bild. Kollisionsproben bei `x+14`/`x+12`
+  (rechts) und `x-4`/`x-2` (links) in den Kachelzeilen `y>>4` und
+  `(y+15)>>4`. Nur Attribut 1 (solide) blockiert seitlich.
+- **Springen**: feste Tabelle `4 8 12 16 20 24 27 30 32 35 37 39 40 41
+  42 43 43 44`, 18 Bilder aufwärts, gespiegelt abwärts, 37 Bilder
+  insgesamt. Kopfstoss an Decken, Landung rastet aufs Kachelraster ein.
+  Gehaltene Sprungtaste springt erneut.
+- **Fallen**: 6, 4 oder 2 px pro Bild, je nachdem, wie nah der Boden ist.
+- **Kachelattribute**: 0 frei, 1 solide, 2 Plattform (von unten
+  durchspringbar, seitlich passierbar, als Boden tragend), 3 tödlich.
+- **Gegner**: Geschwindigkeit, Patrouillengrenzen, Richtungstyp (0
+  rechts, 1 links, 2 auf, 3 ab, 4 Bogen, 5 Hüpfen, 6 Zufallslauf, 7
+  verfolgend), Art (0 Gegner, 1 Plattform, 2 verletzende Plattform),
+  Trefferpunkte (255 = unverwundbar), Animationsprogramm aus
+  Dauer/Sprite-Paaren. Geschwindigkeiten ab 100 sind Schleicher
+  (1 px alle `speed-100` Schritte).
+- **Schuss**: 4 px pro Bild, nach 8 Bildern 6 px, endet an Wänden oder
+  am Bildrand, Explosion mit den Willy-Sprites 22 bis 26.
+- **Türen**: die 24 Türpositionen des Hubs sind in der EXE fest
+  kodiert (Tür n führt zu Level n).
+- **Soundeffekte**: die PC-Speaker-Sequenzen der EXE (Frequenz/Dauer),
+  als weiche Rechteckwelle wiedergegeben.
 
 ### Assets neu generieren
 
 ```bash
 pip install pillow
 python3 tools/extract.py
+python3 tools/font.py
 ```
 
 ## Debug
