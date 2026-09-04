@@ -34,12 +34,17 @@
   let fadeT = 0, blink = 0, msgT = 0;
   let msgLines = null, msgNext = null;
   let storyIdx = 0;
+  let toast = null, toastT = 0;
+
+  /** short status line shown over the playfield */
+  function showToast(s) { toast = s; toastT = 1.8; }
 
   st.mode = 'title';
   Input.onAnyKey(() => { if (st.mode === 'title') toMenu(); });
 
-  // debug/testing: ?level=N[&x=..&y=..] jumps straight into a level
+  // debug/testing: ?level=N[&x=..&y=..] jumps straight into a level, ?god=1 cheats
   const dbgParams = new URLSearchParams(location.search);
+  if (dbgParams.get('god') !== null) st.god = dbgParams.get('god') !== '0';
   if (dbgParams.get('level') !== null) {
     Game.enterLevel(parseInt(dbgParams.get('level'), 10) || 0);
     if (dbgParams.get('x') !== null) {
@@ -152,6 +157,15 @@
     fadeT = 0;
   }
 
+  /** cheat mode: Willy takes no damage at all */
+  function toggleGod() {
+    const on = Game.toggleGod();
+    showToast(on ? 'God mode ON - no damage' : 'God mode off');
+    Audio2.play(on ? 'card' : 'denied');
+    if (on && st.w) Renderer.burst(st.w.x + 8, st.w.y + 8, ['#ffd257', '#ffffff', '#8cf'], 16, 70);
+    return on;
+  }
+
   function toggleFullscreen() {
     const el = document.getElementById('stage');
     if (document.fullscreenElement) document.exitFullscreen();
@@ -167,6 +181,7 @@
       else if (k === 'y') { storyIdx = 0; st.mode = 'story'; Input.onAnyKey(menuStoryNext); }
       else if (k === 'o') Audio2.toggleSfx();
       else if (k === 'm') Audio2.toggleMusic();
+      else if (k === 'g') toggleGod();
       else if (k === 'f') toggleFullscreen();
       else if (k === 't') { st.mode = 'title'; Input.onAnyKey(() => toMenu()); }
       else if (k === 'h' && paused) { paused = false; st.hubReturn = null; startHub(false); }
@@ -177,8 +192,9 @@
     } else if (st.mode === 'play') {
       if (e.key === 'Escape') { paused = true; toMenu(); }
       else if (k === 'f') toggleFullscreen();
-      else if (k === 'm') Audio2.toggleMusic();
-      else if (k === 'o') Audio2.toggleSfx();
+      else if (k === 'm') { showToast('Music: ' + (Audio2.toggleMusic() ? 'on' : 'off')); }
+      else if (k === 'o') { showToast('Sound: ' + (Audio2.toggleSfx() ? 'on' : 'off')); }
+      else if (k === 'g') toggleGod();
     } else if (st.mode === 'end') {
       if (endT > 2) { st.mode = 'menu'; }
     }
@@ -191,20 +207,30 @@
   // ------------------------------------------------------------- rendering
   const lerp = (a, b, t) => a + (b - a) * t;
 
-  function drawHeart(x, y, on) {
-    const c = on ? '#ff3b4a' : '#3a2a3a';
+  function drawHeart(x, y, on, god) {
+    const c = god ? '#ffd257' : (on ? '#ff3b4a' : '#3a2a3a');
     R.rect(x + 1, y, 2, 1, c); R.rect(x + 4, y, 2, 1, c);
     R.rect(x, y + 1, 7, 2, c);
     R.rect(x + 1, y + 3, 5, 1, c);
     R.rect(x + 2, y + 4, 3, 1, c);
     R.rect(x + 3, y + 5, 1, 1, c);
-    if (on) { R.rect(x + 1, y + 1, 1, 1, '#ff9aa4'); }
+    if (on || god) R.rect(x + 1, y + 1, 1, 1, god ? '#fff6c0' : '#ff9aa4');
+  }
+
+  function drawToast() {
+    if (toastT <= 0 || !toast) return;
+    const w = R.textWidth(toast) + 12;
+    const a = Math.min(1, toastT * 3);
+    R.rect((VW - w) >> 1, 18, w, 12, 'rgba(0,0,20,' + (0.75 * a).toFixed(2) + ')');
+    R.text(toast, VW >> 1, 21, '#ffe36a', 'center', '#101020');
   }
 
   function drawHud() {
-    // energy
-    R.rect(2, 2, 40, 10, 'rgba(0,0,20,0.55)');
-    for (let i = 0; i < 4; i++) drawHeart(5 + i * 9, 4, i < st.energy);
+    // energy (golden and always full in god mode)
+    R.rect(2, 2, st.god ? 62 : 40, 10, 'rgba(0,0,20,0.55)');
+    for (let i = 0; i < 4; i++) drawHeart(5 + i * 9, 4, i < st.energy, st.god);
+    if (st.god) R.text('GOD', 44, 4, '#ffd257');
+    drawToast();
     if (st.levelNo === 0) {
       const s = 'DOORS ' + Game.doorsDoneCount() + '/24';
       const w = R.textWidth(s) + 8;
@@ -328,6 +354,7 @@
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     blink += dt;
+    if (toastT > 0) toastT -= dt;
     Input.pollGamepad();
 
     switch (st.mode) {
@@ -347,6 +374,7 @@
         lines.push('[ Y ]  Game story');
         lines.push('[ O ]  Sound effects: ' + (Audio2.sfxEnabled ? 'on' : 'off'));
         lines.push('[ M ]  Music: ' + (Audio2.musicEnabled ? 'on' : 'off'));
+        lines.push('[ G ]  God mode (cheat): ' + (st.god ? 'ON' : 'off'));
         lines.push('[ F ]  Fullscreen');
         if (paused) {
           lines.push('[ H ]  Return to the Galactic Train');

@@ -39,6 +39,7 @@ const Game = (() => {
     shot: null,
     expl: null,
     energy: 4, inv: 0,
+    god: false,           // cheat: immune to enemies and deadly tiles
     needed: 0, card: false,
     keys: { 81: false, 82: false, 83: false },
     result: null,         // 'complete' | 'dead' | {door:n} set by the simulation
@@ -57,15 +58,27 @@ const Game = (() => {
 
   function saveProgress() {
     try {
-      localStorage.setItem('lw_progress', JSON.stringify({ doors: st.doorsDone }));
+      localStorage.setItem('lw_progress',
+        JSON.stringify({ doors: st.doorsDone, god: st.god }));
     } catch (e) { /* private mode */ }
   }
 
   function loadProgress() {
     try {
       const p = JSON.parse(localStorage.getItem('lw_progress') || 'null');
-      if (p && p.doors) st.doorsDone = p.doors;
+      if (p) {
+        if (p.doors) st.doorsDone = p.doors;
+        st.god = !!p.god;
+      }
     } catch (e) { /* ignore */ }
+  }
+
+  /** cheat mode on/off; returns the new state */
+  function toggleGod() {
+    st.god = !st.god;
+    if (st.god) { st.energy = 4; st.inv = 0; }
+    saveProgress();
+    return st.god;
   }
 
   function doorsDoneCount() {
@@ -552,6 +565,7 @@ const Game = (() => {
 
   // ------------------------------------------------------- collisions
   function hurt() {
+    if (st.god) return;
     if (st.inv === 0) { st.energy--; st.inv = 16; }
     Audio2.play('hurt');
     if (st.energy <= 0) die();
@@ -559,7 +573,7 @@ const Game = (() => {
 
   function die() {
     const w = st.w;
-    if (w.alive !== 2) return;
+    if (w.alive !== 2 || st.god) return;
     st.inv = 0;
     w.alive = 1;
     if (w.hst !== 2) w.hst = 0;
@@ -584,7 +598,7 @@ const Game = (() => {
     }
     if (st.inv > 0) st.inv--;
     // deadly tile under the feet
-    if (attr((w.y + 18) >> 4, (w.x + 8) >> 4) === A_DEADLY) {
+    if (!st.god && attr((w.y + 18) >> 4, (w.x + 8) >> 4) === A_DEADLY) {
       Audio2.play('hurt');
       die();
     }
@@ -695,6 +709,6 @@ const Game = (() => {
   }
 
   return { st, TICK, TICK_HZ, VW, VH, WORLD_W, WORLD_H,
-           init, enterLevel, tick, saveProgress, loadProgress,
+           init, enterLevel, tick, saveProgress, loadProgress, toggleGod,
            doorsDoneCount, allDoneExcept, clamp, WF: () => WF };
 })();

@@ -30,6 +30,7 @@ weil das Spiel seine Daten per `fetch` lädt.)
 | `.` / `→`              | Nach rechts                   |
 | `Esc`                  | Menü / Pause                  |
 | `M` / `O` / `F`        | Musik, Effekte, Vollbild      |
+| `G`                    | God-Modus (Cheat) ein und aus |
 
 Gamepads werden unterstützt, auf Touch-Geräten erscheinen
 Bildschirmtasten.
@@ -56,6 +57,26 @@ Gefängnis, in dem Mama festgehalten wird.
 
 Der Spielfortschritt (geschaffte Türen) wird automatisch im Browser
 gespeichert (`localStorage`).
+
+## God-Modus (Cheat)
+
+Das Original ist bockschwer, darum gibt es einen Unsterblichkeits-Modus.
+Mit `G` lässt er sich jederzeit ein und ausschalten, im Menü ebenso wie
+mitten im Level. Ist er aktiv, werden die Herzen golden und oben links
+steht `GOD`.
+
+Was der Modus abschaltet:
+
+- Schaden durch Gegner und durch die verletzenden Plattformen
+- tödliche Kacheln (Stacheln, Lava, Dornen)
+- damit auch jeden Levelneustart durch Sterben
+
+Alles andere bleibt: Exit-Card, Sammelobjekte, Schlüssel und Karten
+müssen weiterhin gefunden werden, und Tür 1 öffnet sich erst, wenn die
+übrigen 24 Türen geschafft sind.
+
+Die Einstellung wird mitgespeichert. Auf Touch-Geräten ohne Tastatur
+lässt sie sich per URL setzen: `?god=1` schaltet ein, `?god=0` aus.
 
 ## Projektstruktur
 
@@ -108,4 +129,5 @@ python3 tools/font.py
 ## Debug
 
 `?level=N` in der URL startet direkt in Level N (0 = Hub),
-optional mit `&x=..&y=..` für die Startposition.
+optional mit `&x=..&y=..` für die Startposition und `&god=1` für den
+God-Modus.
