@@ -1,8 +1,8 @@
 # Little Willy — "Where is mama?" (Browser-Remake)
 
 Browser-Remake des DOS-Spiels **Little Willy v1.1** (© 1993/1994
-I. Mustun / Dimension 16 & M.B. Soft) mit den originalen Levels und der
-originalen Spielmechanik. Die komplette Logik (Laufen, Springen, Fallen,
+I. Mustun / Dimension 16 & M.B. Soft) mit den originalen Levels, dem
+originalen Vorspann samt Story und der originalen Spielmechanik. Die komplette Logik (Laufen, Springen, Fallen,
 Gegner, Items, Schuss, Energie) wurde aus der `LW5.EXE` rekonstruiert
 und läuft wie im Original mit 35 Logikbildern pro Sekunde auf einer
 Welt aus 16x16-Kacheln. Die Grafik wird in der nativen Auflösung
@@ -28,12 +28,34 @@ weil das Spiel seine Daten per `fetch` lädt.)
 | `S` / `Ctrl` / `X`     | Schiessen                     |
 | `,` / `←`              | Nach links                    |
 | `.` / `→`              | Nach rechts                   |
-| `Esc`                  | Menü / Pause                  |
+| `Esc`                  | Menü / Pause, in der Story: überspringen |
 | `M` / `O` / `F`        | Musik, Effekte, Vollbild      |
 | `G`                    | God-Modus (Cheat) ein und aus |
+| `Y` / `T` (im Menü)    | Story nochmals ansehen, Titelbild |
 
 Gamepads werden unterstützt, auf Touch-Geräten erscheinen
 Bildschirmtasten.
+
+## Vorspann und Story
+
+Der Ablauf beim Start ist der des Originals:
+
+1. **«Dimension 16 & M.B. Soft presents»** (`DIM.DAT`): das Bild wird
+   Palettenfarbe für Palettenfarbe eingeblendet, bleibt rund drei
+   Sekunden stehen oder bis eine Taste gedrückt wird und wird gleich
+   wieder ausgeblendet.
+2. **Titelbild** (`TITLE2.DAT`, 320x400): oben der Titel, unten die
+   Credits. Wie im Original hält das Bild gut vier Sekunden und scrollt
+   dann mit zwei Zeilen pro Bildwechsel zur anderen Hälfte und zurück.
+   Eine Taste blendet zum Menü aus.
+3. **Story** bei einem neuen Spiel oder mit `Y` im Menü: die vier
+   Storybilder lösen sich nacheinander per Zufallsmuster ins Bild auf
+   (der «Dissolve» der EXE). Nach dem zweiten und vierten Bild
+   erscheinen die Originaltexte aus `TEXT0.DAT` und `TEXT1.DAT`
+   absatzweise als Kasten beziehungsweise Sprechblase über dem Bild:
+   die Zeilen schliessen sich von oben und unten mit einer weissen
+   Kante, dann wartet `>KEY<` auf eine Taste. Am Schluss löst sich
+   alles nach Schwarz auf. `Esc` überspringt die Story.
 
 ## Das Spiel
 
@@ -132,6 +154,19 @@ index.html    Einstieg
   kodiert (Tür n führt zu Level n).
 - **Soundeffekte**: die PC-Speaker-Sequenzen der EXE (Frequenz/Dauer),
   als weiche Rechteckwelle wiedergegeben.
+- **Bildschirme**: die `.DAT`-Bilder tragen die Windows-Palette, die EXE
+  mappt jeden Farbindex beim Laden auf sein EGA-Attribut um (zum
+  Beispiel 1 auf 4, 4 auf 1, 7 auf 8, 8 auf 7). Der Export macht dasselbe,
+  darum haben Vorspann, Story, Level 1 und Abspann exakt die Farben der
+  Sprites.
+- **Übergänge**: Ein- und Ausblenden setzt die 16 Palettenregister
+  nacheinander (3 Bildwechsel pro Register). Der Dissolve kopiert 32000
+  zufällige Bytes der verdeckten Seite in die sichtbare, alle 700 einen
+  Bildwechsel lang; der Zufallsbereich wächst mit dem Zähler, darum
+  sickert ein Bild zuerst von oben ein. Die Textabsätze (50 bzw. 39
+  Zeilen) werden bei `x=16, y=134` beziehungsweise `x=152, y=25`
+  zeilenpaarweise von aussen nach innen kopiert, alle 3 Bildwechsel
+  ein Paar.
 - **Abspann**: nach Level 1 zeigt das Original die Grafik `END.DAT` und
   animiert dazu die Sprites aus `LEND.SPR` mit einem festen Programm.
   Mama wartet, bückt sich, hebt Willy hoch, dann blitzt das Paar weiss

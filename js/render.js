@@ -76,9 +76,134 @@ const Renderer = (() => {
     b.drawImage(c, Math.round(x), Math.round(y));
   }
 
-  function drawScreen(name) {
-    const img = Assets.img('screens/' + name + '.png');
-    if (img) b.drawImage(img, 0, 0);
+  function screenImg(name) { return Assets.img('screens/' + name + '.png'); }
+
+  /** full-screen picture; `sy` scrolls a taller picture (the 320x400 title) */
+  function drawScreen(name, sy = 0) {
+    const img = screenImg(name);
+    if (img) b.drawImage(img, 0, sy, VW, VH, 0, 0, VW, VH);
+  }
+
+  // ---- palette fades ------------------------------------------------------
+  // The original fades a picture in or out by restoring or blanking the 16
+  // EGA palette entries one after another, so the colours appear (vanish)
+  // one by one.  The pictures are exact EGA colours, so every pixel maps to
+  // its attribute index and the effect can be reproduced per pixel.
+  const EGA = [[0, 0, 0], [0, 0, 170], [0, 170, 0], [0, 170, 170],
+               [170, 0, 0], [170, 0, 170], [170, 85, 0], [170, 170, 170],
+               [85, 85, 85], [85, 85, 255], [85, 255, 85], [85, 255, 255],
+               [255, 85, 85], [255, 85, 255], [255, 255, 85], [255, 255, 255]];
+  const palCache = {};
+  function screenPal(name) {
+    let e = palCache[name];
+    if (e) return e;
+    const img = screenImg(name);
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const cc = c.getContext('2d');
+    cc.drawImage(img, 0, 0);
+    const rgba = cc.getImageData(0, 0, img.width, img.height).data;
+    const n = img.width * img.height;
+    const idx = new Uint8Array(n);
+    const lut = {};
+    EGA.forEach((col, i) => { lut[(col[0] << 16) | (col[1] << 8) | col[2]] = i; });
+    for (let i = 0; i < n; i++) {
+      const key = (rgba[i * 4] << 16) | (rgba[i * 4 + 1] << 8) | rgba[i * 4 + 2];
+      let k = lut[key];
+      if (k === undefined) {          // not an EGA colour: nearest one
+        let bd = 1e9; k = 0;
+        for (let j = 0; j < 16; j++) {
+          const e2 = EGA[j];
+          const d = (rgba[i * 4] - e2[0]) ** 2 + (rgba[i * 4 + 1] - e2[1]) ** 2 + (rgba[i * 4 + 2] - e2[2]) ** 2;
+          if (d < bd) { bd = d; k = j; }
+        }
+        lut[key] = k;
+      }
+      idx[i] = k;
+    }
+    e = { w: img.width, h: img.height, rgba, idx };
+    palCache[name] = e;
+    return e;
+  }
+  const palOut = b.createImageData(VW, VH);
+
+  /** draw a screen showing only the palette entries in `mask` (bit i = colour i) */
+  function drawScreenPal(name, sy, mask) {
+    const e = screenPal(name);
+    const out = palOut.data, src = e.rgba, idx = e.idx;
+    for (let y = 0; y < VH; y++) {
+      const so = (y + sy) * e.w, oo = y * VW;
+      for (let x = 0; x < VW; x++) {
+        const si = so + x, oi = (oo + x) << 2;
+        if (mask & (1 << idx[si])) {
+          const s4 = si << 2;
+          out[oi] = src[s4]; out[oi + 1] = src[s4 + 1]; out[oi + 2] = src[s4 + 2];
+        } else {
+          out[oi] = 0; out[oi + 1] = 0; out[oi + 2] = 0;
+        }
+        out[oi + 3] = 255;
+      }
+    }
+    b.putImageData(palOut, 0, 0);
+  }
+
+  // ---- hidden page + dissolve --------------------------------------------
+  // The story screens are built on a second video page: pictures dissolve
+  // in cell by cell (the original copies random bytes of the hidden page
+  // into the visible one), text paragraphs are copied row by row.
+  const page = document.createElement('canvas');
+  page.width = VW; page.height = VH;
+  const p = page.getContext('2d', { alpha: false });
+  p.imageSmoothingEnabled = false;
+  const CELLS = (VW >> 3) * VH;         // 8000 cells of 8x1 px = the bytes of a plane
+  let order = null, orderPos = 0, orderSplit = 0;
+
+  function pageClear(color = '#000') { p.fillStyle = color; p.fillRect(0, 0, VW, VH); }
+  function pageBlit() { b.drawImage(page, 0, 0); }
+  /** copy a strip of a screen picture into the page */
+  function pageCopy(name, sx, sy, w, h, dx, dy) {
+    const img = screenImg(name);
+    if (img) p.drawImage(img, sx, sy, w, h, dx, dy, w, h);
+  }
+  function pageRect(x, y, w, h, color) { p.fillStyle = color; p.fillRect(x, y, w, h); }
+
+  /** plan a dissolve: the original draws 32000 random cells, the range of
+   *  the random pick growing with the loop counter (the picture first
+   *  seeps in from the top), so the first quarter is such a growing pick
+   *  and the rest a random walk over the cells that are still missing. */
+  function dissolveStart() {
+    const seen = new Uint8Array(CELLS);
+    const a = [];
+    for (let i = 0; i < CELLS; i++) {
+      const c = Math.floor(Math.random() * (i + 1));
+      if (!seen[c]) { seen[c] = 1; a.push(c); }
+    }
+    const rest = [];
+    for (let i = 0; i < CELLS; i++) if (!seen[i]) rest.push(i);
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = rest[i]; rest[i] = rest[j]; rest[j] = t;
+    }
+    orderSplit = a.length;
+    order = Uint16Array.from(a.concat(rest));
+    orderPos = 0;
+  }
+
+  /** advance the dissolve of `src` (screen name, null = black) to progress
+   *  `f` in 0..1; returns true when the picture is complete */
+  function dissolveTo(src, f) {
+    const img = src ? screenImg(src) : null;
+    // first quarter of the time: the growing pick, then the remainder
+    const target = f < 0.25 ? Math.floor(orderSplit * f * 4)
+                            : orderSplit + Math.floor((order.length - orderSplit) * Math.min(1, (f - 0.25) / 0.75));
+    if (!img) p.fillStyle = '#000';
+    for (; orderPos < target && orderPos < order.length; orderPos++) {
+      const c = order[orderPos];
+      const x = (c % 40) << 3, y = (c / 40) | 0;
+      if (img) p.drawImage(img, x, y, 8, 1, x, y, 8, 1);
+      else p.fillRect(x, y, 8, 1);
+    }
+    return orderPos >= order.length;
   }
 
   // ---- background: stars behind fully black tiles -----------------------
@@ -288,6 +413,7 @@ const Renderer = (() => {
 
   return { VW, VH, canvas, ctx: b, buf,
            resize, present, clear, rect, drawSprite, drawSpriteFlash, drawScreen,
+           drawScreenPal, pageClear, pageBlit, pageCopy, pageRect, dissolveStart, dissolveTo,
            initBackdrop, drawStars, drawTiles, hasBlackTiles,
            burst, updateParticles, drawParticles, clearParticles,
            text, bigText, textWidth, panel, textBox, fade,

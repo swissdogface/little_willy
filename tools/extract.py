@@ -32,7 +32,8 @@ Formats (reverse-engineered from LW5.EXE, Turbo-C, huge model):
         + deco sprites (5 B: x,y words, sprite byte)
         + tail: willy x,y; start frame (0 = facing left, 12 = right);
           scroll x,y; exit x,y; required count
-  .DAT  BMP (some with patched magic), 16-color
+  .DAT  BMP (some with patched magic), 16-color, Windows palette order
+        remapped to EGA attributes on load (see DAT_TO_EGA)
 The 24 hub doors are hard-coded in LW5.EXE (function at file offset
 0x77d4); door n leads to level n, door 1 is the final level.
 """
@@ -236,10 +237,24 @@ def parse_lev(fn):
     return m, enemies, items, deco, tail
 
 
+# The .DAT pictures carry the standard Windows 16-colour palette; the EXE
+# remaps every pixel index to the EGA attribute it is displayed with
+# (function at file offset 0x7330: 1->4, 3->6, 4->1, 6->3, 7->8, 8->7,
+# 9->12, 11->14, 12->9, 14->11).  Applying the same table here gives the
+# screens exactly the colours of the sprites and tiles.
+DAT_TO_EGA = [0, 4, 2, 6, 1, 5, 3, 8, 7, 12, 10, 14, 9, 13, 11, 15]
+
+
 def load_dat(fn):
     d = bytearray(open(rp(fn), 'rb').read())
     d[0:2] = b'BM'
-    return Image.open(io.BytesIO(bytes(d))).convert('RGBA')
+    img = Image.open(io.BytesIO(bytes(d)))
+    assert img.mode == 'P', fn
+    pal = []
+    for i in range(16):
+        pal.extend(EGA[DAT_TO_EGA[i]])
+    img.putpalette(pal + [0] * (768 - len(pal)))
+    return img.convert('RGBA')
 
 
 # --------------------------------------------------------------- atlases
@@ -293,13 +308,15 @@ def main():
 
     # ---- level 1 background + full-screen art
     load_dat('LEVEL1.DAT').save(os.path.join(OUT, 'level1_bg.png'))
+    # TITLE2.DAT is 320x400: the title on top, the credits below; the
+    # original scrolls between the two halves.  TEXT0/TEXT1 hold the story
+    # text in 50- and 39-row paragraphs that are shown one after another.
     for fn, key in [('TITLE2.DAT', 'title'), ('DIM.DAT', 'dim'),
                     ('END.DAT', 'end'), ('STORY2.DAT', 'story2'),
                     ('STORY6.DAT', 'story6'), ('STORY11.DAT', 'story11'),
-                    ('STORY13.DAT', 'story13')]:
+                    ('STORY13.DAT', 'story13'), ('TEXT0.DAT', 'text0'),
+                    ('TEXT1.DAT', 'text1')]:
         img = load_dat(fn)
-        if key == 'title':
-            img = img.crop((0, 0, img.width, img.height // 2))
         img.save(os.path.join(OUT, f'screens/{key}.png'))
         print(f'{fn} -> screens/{key}.png {img.size}')
 

@@ -21,7 +21,7 @@ const Assets = (() => {
     const files = new Set();
     for (const key of Object.keys(data.atlas)) files.add(data.atlas[key].file);
     files.add('level1_bg.png');
-    ['title', 'dim', 'end', 'story2', 'story6', 'story11', 'story13']
+    ['title', 'dim', 'end', 'story2', 'story6', 'story11', 'story13', 'text0', 'text1']
       .forEach(s => files.add('screens/' + s + '.png'));
 
     let done = 0;

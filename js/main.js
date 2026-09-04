@@ -1,5 +1,5 @@
 /* Main loop and screen flow:
- * boot -> title -> menu -> story -> hub -> (info -> level)* -> end
+ * boot -> presents -> title -> menu -> story -> hub -> (info -> level)* -> end
  * The simulation runs at a fixed 35 Hz (like the original); rendering
  * happens at the display rate with interpolation between logic frames. */
 'use strict';
@@ -33,14 +33,10 @@
   let paused = false;         // a level is suspended behind the menu
   let fadeT = 0, blink = 0, msgT = 0;
   let msgLines = null, msgNext = null;
-  let storyIdx = 0;
   let toast = null, toastT = 0;
 
   /** short status line shown over the playfield */
   function showToast(s) { toast = s; toastT = 1.8; }
-
-  st.mode = 'title';
-  Input.onAnyKey(() => { if (st.mode === 'title') toMenu(); });
 
   // debug/testing: ?level=N[&x=..&y=..] jumps straight into a level, ?god=1 cheats
   const dbgParams = new URLSearchParams(location.search);
@@ -55,22 +51,94 @@
     Input.clearAnyKey();
   }
 
+  // ------------------------------------------------ intro, title and story
+  // Timings are the original's, counted in vertical retraces (70 Hz).
+  const VS = 1 / 70;
+  const PAL_T = 48 * VS;          // 16 palette entries, 3 retraces each
+  let cine = null;                // state of the running screen sequence
+
+  /** palette mask while fading in (entries appear one by one) */
+  const palIn = (t) => (1 << Math.min(16, Math.floor(t / (3 * VS)) + 1)) - 1;
+  /** palette mask while fading out (entries vanish one by one) */
+  const palOut = (t) => ~palIn(t) & 0xffff;
+
+  /* "Dimension 16 & M.B. Soft presents": DIM.DAT fades in, stays about
+   * three seconds or until a key is pressed, then the title fades in. */
+  function startIntro() {
+    st.mode = 'intro';
+    cine = { phase: 'in', t: 0 };
+    Input.onAnyKey(() => {
+      if (st.mode === 'intro' && cine.phase !== 'out') { cine.phase = 'out'; cine.t = 0; }
+    });
+  }
+
+  /* The title picture is 320x400: the title on top, the credits below. The
+   * original holds each half for 300 retraces and scrolls between them at
+   * two rows per retrace; any key fades out to the menu. */
+  function startTitle() {
+    st.mode = 'title';
+    cine = { phase: 'in', t: 0, y: 0, dir: 1 };
+    Input.onAnyKey(() => {
+      if (st.mode === 'title' && cine.phase !== 'out') { cine.phase = 'out'; cine.t = 0; }
+    });
+  }
+
+  /* The story as LW5.EXE plays it: four pictures dissolve in one after the
+   * other; after the second and the fourth the text paragraphs of
+   * TEXT0.DAT/TEXT1.DAT close over the picture like a curtain, each one
+   * waiting for a key ('>KEY<'), and at the end everything dissolves to
+   * black.  Rows and positions are the ones hard-coded in the EXE. */
   const STORY = [
-    { img: 'story2', lines: ['Willy and his mother live happily', 'on a small green planet ...'] },
-    { img: 'story6', lines: ['Oh no! An attack on the space station!', 'Mama has been kidnapped!'] },
-    { img: 'story11', lines: ['The kidnappers escaped', 'through the Galactic Train ...'] },
-    { img: 'story13', lines: ['Willy follows them.', 'And you must help him!', '', '"Where is mama?"'] },
+    { kind: 'dissolve', img: 'story2' },
+    { kind: 'dissolve', img: 'story6' },
+    { kind: 'text', img: 'text0', blocks: 4, bh: 50, rows: 50, steps: 26, white: 24,
+      x: 16, y: 134, w: 160 },
+    { kind: 'dissolve', img: 'story11' },
+    { kind: 'dissolve', img: 'story13' },
+    { kind: 'text', img: 'text1', blocks: 4, bh: 39, rows: 38, steps: 20, white: 19,
+      x: 152, y: 25, w: 136 },
+    { kind: 'dissolve', img: null },
   ];
+  const DISSOLVE_T = 46 * VS;     // 32000 cell copies, one retrace per 700
+
+  function startStory(next) {
+    st.mode = 'story';
+    cine = { step: -1, next };
+    R.pageClear();
+    storyAdvance();
+  }
+
+  function storyAdvance() {
+    const c = cine;
+    c.step++;
+    c.t = 0;
+    if (c.step >= STORY.length) { storyEnd(); return; }
+    const s = STORY[c.step];
+    if (s.kind === 'dissolve') R.dissolveStart();
+    else { c.block = 0; c.k = -1; c.wait = false; }
+  }
+
+  function storyKey() {
+    const c = cine;
+    if (!c || st.mode !== 'story' || !c.wait) return;
+    c.block++;
+    if (c.block >= STORY[c.step].blocks) storyAdvance();
+    else { c.k = -1; c.t = 0; c.wait = false; }
+  }
+
+  function storyEnd() {
+    const next = cine.next;
+    cine = null;
+    Input.clearAnyKey();
+    next();
+  }
+
+  /** Esc skips the rest of the story, as in the original */
+  function storySkip() { if (st.mode === 'story' && cine) storyEnd(); }
 
   function toMenu() {
     st.mode = 'menu';
     Audio2.music(null);
-  }
-
-  function menuStoryNext() {
-    storyIdx++;
-    if (storyIdx >= STORY.length) toMenu();
-    else Input.onAnyKey(menuStoryNext);
   }
 
   function startNewGame() {
@@ -78,21 +146,13 @@
     Game.saveProgress();
     st.hubReturn = null;
     paused = false;
-    storyIdx = 0;
-    st.mode = 'story';
-    Input.onAnyKey(advanceStory);
+    startStory(() => startHub(true));
   }
 
   function continueGame() {
     st.hubReturn = null;
     paused = false;
     startHub(true);
-  }
-
-  function advanceStory() {
-    storyIdx++;
-    if (storyIdx >= STORY.length) startHub(true);
-    else Input.onAnyKey(advanceStory);
   }
 
   function startHub(showKeys) {
@@ -179,12 +239,12 @@
     if (st.mode === 'menu') {
       if (k === 'n') startNewGame();
       else if (k === 'c') continueGame();
-      else if (k === 'y') { storyIdx = 0; st.mode = 'story'; Input.onAnyKey(menuStoryNext); }
+      else if (k === 'y') startStory(toMenu);
       else if (k === 'o') Audio2.toggleSfx();
       else if (k === 'm') Audio2.toggleMusic();
       else if (k === 'g') toggleGod();
       else if (k === 'f') toggleFullscreen();
-      else if (k === 't') { st.mode = 'title'; Input.onAnyKey(() => toMenu()); }
+      else if (k === 't') startTitle();
       else if (k === 'h' && paused) { paused = false; st.hubReturn = null; startHub(false); }
       else if (e.key === 'Escape' && paused) {
         paused = false; st.mode = 'play';
@@ -196,6 +256,8 @@
       else if (k === 'm') { showToast('Music: ' + (Audio2.toggleMusic() ? 'on' : 'off')); }
       else if (k === 'o') { showToast('Sound: ' + (Audio2.toggleSfx() ? 'on' : 'off')); }
       else if (k === 'g') toggleGod();
+    } else if (st.mode === 'story') {
+      if (e.key === 'Escape') storySkip();
     } else if (st.mode === 'end') {
       if (endT > 2) { st.mode = 'menu'; }
     }
@@ -376,12 +438,47 @@
     Input.pollGamepad();
 
     switch (st.mode) {
-      case 'title':
-        R.drawScreen('title');
+      case 'intro': {
+        const c = cine;
+        c.t += dt;
+        if (c.phase === 'in') {
+          R.drawScreenPal('dim', 0, palIn(c.t));
+          if (c.t >= PAL_T) { c.phase = 'hold'; c.t = 0; }
+        } else if (c.phase === 'hold') {
+          R.drawScreen('dim');
+          if (c.t >= 200 * VS) { c.phase = 'out'; c.t = 0; }
+        } else {
+          R.drawScreenPal('dim', 0, palOut(c.t));
+          if (c.t >= PAL_T) startTitle();
+        }
+        break;
+      }
+
+      case 'title': {
+        const c = cine;
+        c.t += dt;
+        if (c.phase === 'in') {
+          R.drawScreenPal('title', c.y, palIn(c.t));
+          if (c.t >= PAL_T) { c.phase = 'hold'; c.t = 0; }
+          break;
+        }
+        if (c.phase === 'out') {
+          R.drawScreenPal('title', Math.round(c.y), palOut(c.t));
+          if (c.t >= PAL_T) toMenu();
+          break;
+        }
+        if (c.phase === 'hold') {
+          if (c.t >= 300 * VS) { c.phase = 'scroll'; c.t = 0; }
+        } else {                                   // scroll: 2 rows per retrace
+          c.y = Game.clamp(c.y + c.dir * 2 * dt / VS, 0, VH);
+          if (c.y === 0 || c.y === VH) { c.dir = -c.dir; c.phase = 'hold'; c.t = 0; }
+        }
+        R.drawScreen('title', Math.round(c.y));
         if (Math.floor(blink * 1.6) % 2 === 0) {
           R.text('> Press any key <', VW / 2, VH - 14, '#ffffff', 'center', '#202040');
         }
         break;
+      }
 
       case 'menu': {
         R.drawScreen('title');
@@ -404,9 +501,29 @@
       }
 
       case 'story': {
-        const s = STORY[Math.min(storyIdx, STORY.length - 1)];
-        R.drawScreen(s.img);
-        R.textBox([...s.lines, '', '> Press any key <'], { y: VH - 14 - (s.lines.length + 2) * 10 - 8, w: 300 });
+        const c = cine, s = STORY[c.step];
+        c.t += dt;
+        if (s.kind === 'dissolve') {
+          if (R.dissolveTo(s.img, c.t / DISSOLVE_T)) storyAdvance();
+          R.pageBlit();
+          break;
+        }
+        // a text paragraph closes over the picture from both edges, one
+        // pair of rows every three retraces, a white line at each edge
+        const k = Math.min(s.steps - 1, Math.floor(c.t / (3 * VS)));
+        while (c.k < k) {
+          c.k++;
+          const top = c.block * s.bh + c.k, bot = c.block * s.bh + s.rows - 1 - c.k;
+          R.pageCopy(s.img, 0, top, s.w, 1, s.x, s.y + c.k);
+          R.pageCopy(s.img, 0, bot, s.w, 1, s.x, s.y + s.rows - 1 - c.k);
+          if (c.k < s.white) {
+            R.pageRect(s.x, s.y + c.k + 1, s.w, 1, '#ffffff');
+            R.pageRect(s.x, s.y + s.rows - 2 - c.k, s.w, 1, '#ffffff');
+          }
+        }
+        if (!c.wait && c.k >= s.steps - 1) { c.wait = true; Input.onAnyKey(storyKey); }
+        R.pageBlit();
+        if (c.wait) R.text('>KEY<', 272, 185, '#ff55ff');
         break;
       }
 
@@ -479,5 +596,6 @@
     requestAnimationFrame(frame);
   }
 
+  if (st.mode !== 'play') startIntro();
   requestAnimationFrame(frame);
 })();
