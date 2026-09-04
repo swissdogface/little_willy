@@ -160,7 +160,7 @@
   /** cheat mode: Willy takes no damage at all */
   function toggleGod() {
     const on = Game.toggleGod();
-    showToast(on ? 'God mode ON - no damage' : 'God mode off');
+    showToast(on ? 'God mode ON - items granted' : 'God mode off');
     Audio2.play(on ? 'card' : 'denied');
     if (on && st.w) Renderer.burst(st.w.x + 8, st.w.y + 8, ['#ffd257', '#ffffff', '#8cf'], 16, 70);
     return on;

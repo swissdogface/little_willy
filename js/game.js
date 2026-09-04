@@ -76,9 +76,29 @@ const Game = (() => {
   /** cheat mode on/off; returns the new state */
   function toggleGod() {
     st.god = !st.god;
-    if (st.god) { st.energy = 4; st.inv = 0; }
+    if (st.god) {
+      st.energy = 4; st.inv = 0;
+      if (st.level) grantAll();
+    }
     saveProgress();
     return st.god;
+  }
+
+  /** god mode: Willy owns the exit card, all keys and all mystical-stone
+   *  cards from the start, so only the way to the exit is left to do. */
+  function grantAll() {
+    st.card = true;
+    st.keys = { 81: true, 82: true, 83: true };
+    st.needed = 0;
+    for (const it of st.items) {
+      if (it.kind === 2) {
+        // the card's mystical stone dissolves, as if the card was taken
+        st.map[(it.y >> 4) * 40 + (it.x >> 4)] = 0;
+        it.state = 2;
+      } else if (it.kind === 3 || (it.spr >= 81 && it.spr <= 83)) {
+        it.state = 2;                 // exit card and keys are in the pocket
+      }
+    }
   }
 
   function doorsDoneCount() {
@@ -150,6 +170,7 @@ const Game = (() => {
     st.energy = 4; st.inv = 0;
     st.card = false;
     st.needed = L.need;
+    if (st.god) grantAll();
     st.stats = { shots: 0, kills: 0 };
 
     st.cam.x = clamp(L.scx, 0, WORLD_W - VW);
@@ -423,7 +444,10 @@ const Game = (() => {
       if (it.kind === 0) {
         it.state = 2;
         Audio2.play('pickup');
-        if (it.spr === 80 || it.spr === 88 || it.spr === 89) st.needed--;
+        // note: on level 20 the drink-boxes must NOT be taken - the counter
+        // goes negative there and the exit stays shut, exactly as in the
+        // original. In god mode the counter is pinned at zero instead.
+        if (!st.god && (it.spr === 80 || it.spr === 88 || it.spr === 89)) st.needed--;
         Renderer.burst(it.x + 12, it.y + 8, ['#ff9ad5', '#ffffff'], 8, 50);
         continue;
       }

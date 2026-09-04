@@ -71,9 +71,21 @@ Was der Modus abschaltet:
 - tödliche Kacheln (Stacheln, Lava, Dornen)
 - damit auch jeden Levelneustart durch Sterben
 
-Alles andere bleibt: Exit-Card, Sammelobjekte, Schlüssel und Karten
-müssen weiterhin gefunden werden, und Tür 1 öffnet sich erst, wenn die
-übrigen 24 Türen geschafft sind.
+Was der Modus dazugibt, jeweils beim Levelstart und beim Einschalten
+mitten im Level:
+
+- die **Exit-Card**, der Ausgang ist also sofort offen
+- alle drei **Schlüssel**
+- alle **Karten** samt ihren mystischen Steinen, die sich auflösen
+- den Zähler für Drink-Boxes und Lollypops auf null
+
+Zu tun bleibt der Weg zum Ausgang. Die Sammelobjekte liegen weiterhin
+herum und dürfen eingesammelt werden, sie zählen nur nicht mehr. Auch
+die Falle von Level 20, wo das Nehmen der Drink-Boxes den Ausgang
+verriegelt, greift im God-Modus nicht mehr.
+
+Unverändert bleibt Tür 1: das Finale öffnet sich weiterhin erst, wenn
+die übrigen 24 Türen geschafft sind.
 
 Die Einstellung wird mitgespeichert. Auf Touch-Geräten ohne Tastatur
 lässt sie sich per URL setzen: `?god=1` schaltet ein, `?god=0` aus.
