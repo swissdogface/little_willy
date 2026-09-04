@@ -208,6 +208,23 @@
   // ------------------------------------------------------------- rendering
   const lerp = (a, b, t) => a + (b - a) * t;
 
+  /* The reunion at the end, from LEND.SPR. The [duration, frame] program is
+   * the one LW5.EXE feeds to the ending figure: Mama waits, bends down, picks
+   * Willy up, then the pair flashes white (frame 11) and is gone (frame 12)
+   * before it starts over. */
+  const END_ANIM = [[55, 0], [2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [2, 6],
+                    [2, 7], [2, 8], [2, 9], [25, 10],
+                    [1, 11], [6, 10], [1, 11], [5, 10], [1, 11], [4, 10],
+                    [1, 11], [3, 10], [1, 11], [1, 10], [1, 11], [1, 10],
+                    [1, 11], [1, 10], [1, 11], [1, 10], [20, 12]];
+  const END_TOTAL = END_ANIM.reduce((s, p) => s + p[0], 0);
+
+  function endFrame(tick) {
+    let k = tick % END_TOTAL;
+    for (const [d, f] of END_ANIM) { if (k < d) return f; k -= d; }
+    return 0;
+  }
+
   function drawHeart(x, y, on, god) {
     const c = god ? '#ffd257' : (on ? '#ff3b4a' : '#3a2a3a');
     R.rect(x + 1, y, 2, 1, c); R.rect(x + 4, y, 2, 1, c);
@@ -443,12 +460,14 @@
       case 'end': {
         endT += dt;
         R.drawScreen('end');
-        const lines = ['You did it. Mama is free!', '',
-                       'Willy and his mother return home.', '',
-                       'Thanks and ... see you later!', '',
-                       '(c) 1993/94 I. Mustun, Dimension 16', '',
-                       endT > 2 ? '> Press any key <' : ''];
-        R.textBox(lines, { y: 4, w: 260 });
+        // Willy and his mother, reunited, on the original's closing artwork
+        R.drawSprite('lend', endFrame(Math.floor(endT * Game.TICK_HZ)),
+                     (VW - 40) >> 1, 94);
+        const lines = ['You did it - Mama is free!', '',
+                       '(c) 1993/94 I. Mustun, Dimension 16'];
+        lines.push(endT > 2 && Math.floor(blink * 1.6) % 2 === 0
+                   ? '> Press any key <' : '');
+        R.textBox(lines, { title: true, y: VH - 56, w: 236 });
         break;
       }
 

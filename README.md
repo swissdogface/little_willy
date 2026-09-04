@@ -132,6 +132,11 @@ index.html    Einstieg
   kodiert (Tür n führt zu Level n).
 - **Soundeffekte**: die PC-Speaker-Sequenzen der EXE (Frequenz/Dauer),
   als weiche Rechteckwelle wiedergegeben.
+- **Abspann**: nach Level 1 zeigt das Original die Grafik `END.DAT` und
+  animiert dazu die Sprites aus `LEND.SPR` mit einem festen Programm.
+  Mama wartet, bückt sich, hebt Willy hoch, dann blitzt das Paar weiss
+  auf und verschwindet, bevor die Schleife von vorn beginnt. Dass die
+  Siegesgrafik «GAME OVER» zeigt, ist so im Original angelegt.
 
 ### Assets neu generieren
 
