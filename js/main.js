@@ -136,7 +136,8 @@
   }
 
   function enterDoor(n) {
-    if (n === 1 && !Game.allDoneExcept(1)) {
+    // door 1 is the finale and normally needs the other 24 levels first
+    if (n === 1 && !st.god && !Game.allDoneExcept(1)) {
       Audio2.play('denied');
       showMessage(['*** Little Willy ***', '', 'This is the last level!',
                    'At first, play all other levels.', '', '> Press any key <'],

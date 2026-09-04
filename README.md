@@ -79,13 +79,16 @@ mitten im Level:
 - alle **Karten** samt ihren mystischen Steinen, die sich auflösen
 - den Zähler für Drink-Boxes und Lollypops auf null
 
+- **Tür 1**, das Finale mit dem Gefängnis, ist sofort begehbar, statt
+  erst nach den übrigen 24 Türen
+
 Zu tun bleibt der Weg zum Ausgang. Die Sammelobjekte liegen weiterhin
 herum und dürfen eingesammelt werden, sie zählen nur nicht mehr. Auch
 die Falle von Level 20, wo das Nehmen der Drink-Boxes den Ausgang
 verriegelt, greift im God-Modus nicht mehr.
 
-Unverändert bleibt Tür 1: das Finale öffnet sich weiterhin erst, wenn
-die übrigen 24 Türen geschafft sind.
+Im normalen Modus bleibt alles wie im Original, die Falle von Level 20
+eingeschlossen.
 
 Die Einstellung wird mitgespeichert. Auf Touch-Geräten ohne Tastatur
 lässt sie sich per URL setzen: `?god=1` schaltet ein, `?god=0` aus.
