@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "Little Willy · Earth II",
+  "short_name": "Little Willy",
+  "description": "The original Earth II adventure, remastered for the web.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b1220",
+  "theme_color": "#0c1727",
+  "icons": [
+    {"src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ]
+}

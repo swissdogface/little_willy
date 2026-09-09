@@ -1,30 +1,34 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<!doctype html>
+<html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Little Willy — Where is mama?</title>
-<link rel="stylesheet" href="css/style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🍭</text></svg>">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0c1727">
+<meta name="description" content="Little Willy – the original Earth II adventure, lovingly remastered for the web.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Little Willy">
+<title>Little Willy · Earth II</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="title-original.png">
+<link rel="stylesheet" href="style-v2.css">
 </head>
 <body>
-<div id="stage">
-  <canvas id="game" width="320" height="200"></canvas>
-  <div id="touch-controls">
-    <div class="tc-left">
-      <button data-k="left" aria-label="left">&#9664;</button><button data-k="right" aria-label="right">&#9654;</button>
-    </div>
-    <div class="tc-right">
-      <button data-k="shot" aria-label="shoot">&#10022;</button><button data-k="jump" aria-label="jump">&#9650;</button>
-    </div>
-  </div>
+<canvas id="scene" aria-label="Little Willy game area"></canvas>
+<div id="intro" class="intro-screen"><img src="intro.png" alt="Original startup screen: Dimension16 I. Mustun – M.B. Soft presents"><button id="skipIntro">Continue ▸</button></div>
+<main id="home" class="home overlay" hidden>
+ <div class="poster"><img src="title-original.png" alt="Original title: Little Willy – Where is mama?"></div>
+ <div class="home-copy"><div class="eyebrow">EARTH II · THE ORIGINAL ADVENTURE</div><h1>Little Willy<span>Back on Earth II.</span></h1><p>Explore the space station and its alien worlds.<br>Find the exit cards. Rescue Mom and your sister.</p>
+ <div class="home-buttons"><button id="start" class="primary">Enter Space Station <span>→</span></button><button id="continue" class="secondary" hidden>Resume Level</button><button id="levelSelect" class="secondary">Choose Worlds</button><button id="settings" class="secondary">Settings</button><button id="installWeb" class="secondary" hidden>Install App</button></div>
+ <div class="home-notes">24 original maps · HD artwork · Shooting · Music</div><div class="credits">Based on the game by I. Mustun · Dimension16 / M.B. Soft</div></div>
+</main>
+<div id="hud" hidden>
+ <div class="topbar"><div class="level-info"><span id="levelNumber" class="eyebrow"></span><strong id="levelTitle"></strong></div><div class="vitals"><span id="hearts"></span><span id="goals"></span></div><div class="top-actions"><button id="fullscreen" class="pill" aria-label="Full screen">⛶</button><button id="musicQuick" class="pill" aria-label="Toggle music">♫</button><button id="godQuick" class="pill">God: off</button><button id="pause" class="pill" aria-label="Pause">Ⅱ</button></div></div>
+ <div id="hint"></div><div id="toast" role="status"></div>
+ <div class="controls"><div class="move"><button data-key="left" aria-label="Move left">◀</button><button data-key="right" aria-label="Move right">▶</button><button data-key="down" class="small" aria-label="Drop through platform">↓</button></div><div id="keysInfo"></div><div class="actions"><button data-key="up" id="enterDoor" class="small" aria-label="Enter door">DOOR ↑</button><button data-key="shoot" class="shoot" aria-label="Shoot">●<small>SHOOT</small></button><button data-key="jump" class="jump" aria-label="Jump">↑<small>JUMP</small></button></div></div>
 </div>
-<script src="js/font.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/input.js"></script>
-<script src="js/assets.js"></script>
-<script src="js/render.js"></script>
-<script src="js/game.js"></script>
-<script src="js/main.js"></script>
-</body>
-</html>
+<div id="modal" class="overlay modal" hidden><section id="panel" class="panel"></section></div>
+<div id="rotate">Please rotate your device to landscape ↻</div>
+<script src="levels.js"></script><script src="art.js"></script><script src="engine-v2.js"></script><script src="renderer.js"></script><script src="game-v2.js"></script><script src="web-shell.js"></script>
+</body></html>

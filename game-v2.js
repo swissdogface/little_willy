@@ -1,0 +1,107 @@
+'use strict';
+(()=>{
+const $=id=>document.getElementById(id),canvas=$('scene'),ctx=canvas.getContext('2d',{alpha:false});
+let prefs={god:false,gentle:false,music:true,sound:true,hd:true},progress={done:[],last:0};
+try{Object.assign(prefs,JSON.parse(localStorage.getItem('willy-v2-prefs')||'{}'));Object.assign(progress,JSON.parse(localStorage.getItem('willy-v2-progress')||'{}'));}catch(e){}
+if(!Array.isArray(progress.done))progress.done=[];
+const game=new WillyEngine.Game(WILLY_LEVELS,{...prefs,done:progress.done});WillyRenderer.setHD(prefs.hd);
+let mode='intro',W=960,H=432,dpr=1,clock=0,last=0,acc=0,toastTimer=0,keys={},jumpPress=false,upPress=false,shootPress=false,cam={x:0,y:0};
+let ac=null,musicBus=null,fxBus=null,nextBeat=0,beat=0,musicNodes=[];
+const melodies=[
+ [0,7,12,7,4,7,11,7,2,7,14,11,4,2,0,-1],
+ [0,3,7,12,10,7,3,7,5,8,12,8,7,3,2,-1],
+ [0,4,7,9,12,9,7,4,2,5,9,12,11,7,4,-1],
+ [0,7,10,12,7,3,5,7,10,14,12,10,7,5,3,-1],
+ [0,2,7,9,14,12,9,7,4,7,11,14,12,7,4,-1],
+ [0,7,3,10,12,10,7,3,5,12,8,7,3,2,0,-1]
+];
+function persist(){try{localStorage.setItem('willy-v2-prefs',JSON.stringify(prefs));localStorage.setItem('willy-v2-progress',JSON.stringify(progress));}catch(e){}}
+function audioStart(){try{if(!ac){ac=new(window.AudioContext||window.webkitAudioContext)();musicBus=ac.createGain();musicBus.gain.value=prefs.music?.12:0;musicBus.connect(ac.destination);fxBus=ac.createGain();fxBus.gain.value=.12;fxBus.connect(ac.destination);nextBeat=ac.currentTime;}if(ac.state==='suspended')ac.resume();}catch(e){}}
+function note(freq,t,length,volume,type,bus){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(volume,t+.008);g.gain.exponentialRampToValueAtTime(.001,t+length);o.connect(g);g.connect(bus);o.start(t);o.stop(t+length+.02);o.onended=()=>{o.disconnect();g.disconnect();};}
+function music(){
+ if(!ac||ac.state!=='running'||document.hidden||!prefs.music||mode==='pause')return;
+ if(nextBeat<ac.currentTime-.2)nextBeat=ac.currentTime;
+ const theme=game.index===0?0:Number(game.level.theme.slice(1))%6,root=[48,50,48,45,53,43][theme],minor=[false,true,false,true,false,true][theme];
+ while(nextBeat<ac.currentTime+.12){
+  const n=beat%32,bar=Math.floor(beat/32)%4,chord=[0,minor?8:5,minor?3:9,7][bar];
+  if(n%2===0){const pitch=melodies[theme][n/2];if(pitch>=0)note(440*2**((root+24+pitch-69)/12),nextBeat,.23,.28,'triangle',musicBus);}
+  if(n%4===0){const bass=root+chord;note(440*2**((bass-69)/12),nextBeat,.34,.38,'sine',musicBus);note(80,nextBeat,.055,.14,'triangle',musicBus);}
+  if(n%4===2){const third=minor?3:4,arp=[0,third,7,12][Math.floor(n/4)%4];note(440*2**((root+12+chord+arp-69)/12),nextBeat,.16,.12,'sine',musicBus);}
+  nextBeat+=60/[108,100,112,118,96,104][theme]/4;beat++;
+ }
+}
+function sound(type){
+ if(!prefs.sound||!ac)return;const p={jump:[370,550],shoot:[890,320],collect:[740,1100],card:[523,659,784],unlock:[440,660],hurt:[150,65],respawn:[220,330],complete:[523,659,784,1046],defeat:[170,90],impact:[280],forbidden:[190,120]};
+ (p[type]||[]).forEach((f,i)=>note(f,ac.currentTime+i*.045,type==='shoot'?.065:.12,.35,type==='shoot'?'sawtooth':'triangle',fxBus));
+}
+function toast(text){$('toast').textContent=text;$('toast').style.opacity=1;toastTimer=3.5;}
+function exitMessage(status){
+ const missing=[];if(status.missingCard)missing.push('exit card');if(status.remaining)missing.push(status.remaining+' cans/lollipops');
+ if(missing.length)return (status.near?'Door locked · ':'Still needed: ')+missing.join(' and ');
+ return status.near?'Exit ready · Press EXIT ↑':'Go to the EXIT door · Press EXIT ↑ there';
+}
+function resetInputs(){keys={};jumpPress=false;upPress=false;shootPress=false;document.querySelectorAll('.pressed').forEach(b=>b.classList.remove('pressed'));}
+function sync(){
+ $('levelNumber').textContent=game.index?'ORIGINAL MAP · '+String(game.index).padStart(2,'0'):'EARTH II · '+progress.done.length+' / 24 COMPLETED';$('levelTitle').textContent=game.level.name;
+ $('hearts').textContent=prefs.god?'∞ INVINCIBLE':'♥'.repeat(Math.max(0,game.player.hp));
+ $('goals').textContent=game.index?`${game.level.required?'Cans & lollipops: '+game.collected+'/'+game.level.required:'Do not collect cans'}  ·  Card ${game.card?'✓':'–'}`:'Choose a door';
+ $('godQuick').textContent='God: '+(prefs.god?'on':'off');$('godQuick').setAttribute('aria-pressed',String(prefs.god));$('musicQuick').textContent=prefs.music?'♫ On':'♫ Off';$('musicQuick').setAttribute('aria-pressed',String(prefs.music));
+ $('keysInfo').textContent=game.keys.map((n,i)=>(['🟢','🔴','🟡'][i])+' '+n).join('  ');
+ const exit=game.exitStatus();$('enterDoor').hidden=false;$('enterDoor').textContent=game.index?'EXIT ↑':'DOOR ↑';$('enterDoor').setAttribute('aria-label',game.index?'Open exit':'Enter door');$('enterDoor').classList.toggle('exit-ready',!!game.index&&exit.ready&&exit.near);
+ const completedDoor=game.nearDoor&&game.done.includes(game.nearDoor.id);$('hint').textContent=game.index?exitMessage(exit):(game.nearDoor?'Door '+String(game.nearDoor.id).padStart(2,'0')+(completedDoor?' · COMPLETED ✓ · Press ↑ to replay':' · Press ↑ to enter'):'Walk to a door · Press ↑ to enter');
+ $('continue').hidden=!progress.last;$('continue').textContent='Play Level '+String(progress.last).padStart(2,'0')+' again';
+ document.body.dataset.mode=mode;document.body.dataset.level=String(game.index);document.body.dataset.music=String(prefs.music);document.body.dataset.god=String(prefs.god);
+}
+function start(index){audioStart();game.load(index);game.god=prefs.god;game.gentle=prefs.gentle;mode='play';$('home').hidden=true;$('modal').hidden=true;$('hud').hidden=false;resetInputs();WillyRenderer.prepare(game.level);cam.x=game.level.camera.x;cam.y=game.level.camera.y;progress.last=index;persist();beat=0;if(ac)nextBeat=ac.currentTime;sync();last=performance.now();acc=0;}
+function home(){mode='home';resetInputs();$('home').hidden=false;$('modal').hidden=true;$('hud').hidden=true;persist();sync();}
+function showModal(html){resetInputs();$('panel').innerHTML=html;$('modal').hidden=false;sync();}
+function resume(){mode=$('home').hidden?'play':'home';$('modal').hidden=true;resetInputs();last=performance.now();acc=0;audioStart();sync();}
+function toggleGod(){prefs.god=!prefs.god;game.setGod(prefs.god);persist();sync();toast(prefs.god?'God Mode on · Willy is invincible':'God Mode off');}
+function toggleMusic(){prefs.music=!prefs.music;audioStart();if(musicBus){musicBus.gain.cancelScheduledValues(ac.currentTime);musicBus.gain.setTargetAtTime(prefs.music?.12:0,ac.currentTime,.03);nextBeat=ac.currentTime;}persist();sync();}
+function options(paused=false){
+ mode=paused?'pause':'settings';
+ showModal(`<div class="eyebrow">LITTLE WILLY · SETTINGS</div><h2>${paused?'Pause':'Your Adventure'}</h2><div class="row"><div><strong>God Mode</strong><small>Invincible. Keys and level goals are still required.</small></div><button id="godSetting" class="switch" aria-pressed="${prefs.god}">${prefs.god?'On':'Off'}</button></div><div class="row"><div><strong>Music</strong><small>New melodies inspired by the alien worlds.</small></div><button id="musicSetting" class="switch" aria-pressed="${prefs.music}">${prefs.music?'On':'Off'}</button></div><div class="row"><div><strong>Sound Effects</strong><small>Shots, jumps, hits and collected items.</small></div><button id="soundSetting" class="switch" aria-pressed="${prefs.sound}">${prefs.sound?'On':'Off'}</button></div><div class="row"><div><strong>Gentler Difficulty</strong><small>Start each level with 6 hearts instead of 4; enemies move more slowly.</small></div><button id="gentleSetting" class="switch" aria-pressed="${prefs.gentle}">${prefs.gentle?'On':'Off'}</button></div><div class="row"><div><strong>Graphics</strong><small>Smoother outlines, new gradients and cartoon Willy.</small></div><button id="hdSetting" class="switch" aria-pressed="${prefs.hd}">${prefs.hd?'HD':'DOS Pixels'}</button></div><div class="instructions">← → / A D: move · Space: jump · S / J: shoot · ↑ / W: door<br>↓: drop through a thin platform · G: God Mode · M: music · Esc: pause</div><div class="panel-actions"><button id="resume" class="primary">${paused?'Continue':'Back'}</button>${paused?'<button id="restart" class="secondary">Restart Level</button><button id="hub" class="secondary">Space Station</button><button id="menu" class="secondary">Main Menu</button>':''}</div>`);
+ $('godSetting').onclick=()=>{toggleGod();options(paused);};$('musicSetting').onclick=()=>{toggleMusic();options(paused);};$('soundSetting').onclick=()=>{prefs.sound=!prefs.sound;audioStart();persist();options(paused);};$('gentleSetting').onclick=()=>{prefs.gentle=!prefs.gentle;game.setGentle(prefs.gentle);persist();options(paused);};$('hdSetting').onclick=()=>{prefs.hd=!prefs.hd;WillyRenderer.setHD(prefs.hd);persist();options(paused);};$('resume').onclick=resume;
+ if(paused){$('restart').onclick=()=>start(game.index);$('hub').onclick=()=>start(0);$('menu').onclick=home;}
+}
+function levels(){mode='levels';const ids=[...Array.from({length:23},(_,i)=>i+2),1],finalUnlocked=ids.slice(0,23).every(n=>progress.done.includes(n));showModal(`<div class="eyebrow">THE ORIGINAL WORLDS</div><h2>Choose Worlds</h2><p>The same maps and themes as in 1993. The final level unlocks after the other 23 levels.</p><button id="hubSelect" class="secondary wide-button">Enter Earth II Space Station →</button><div class="level-grid">${ids.map(n=>`<button class="level-card ${progress.done.includes(n)?'done':''}" data-level="${n}" ${n===1&&!finalUnlocked?'disabled':''}><strong>${n===1?'FINAL'+(finalUnlocked?'':' 🔒'):String(n).padStart(2,'0')}${progress.done.includes(n)?' ✓':''}</strong>${WILLY_LEVELS[n].name.replace(' · Final','')}</button>`).join('')}</div><div class="panel-actions"><button id="closeLevels" class="secondary">Back</button></div>`);$('hubSelect').onclick=()=>start(0);$('closeLevels').onclick=resume;document.querySelectorAll('#panel [data-level]').forEach(b=>b.onclick=()=>start(Number(b.dataset.level)));}
+function finish(){mode='complete';progress.done=game.done;progress.last=0;persist();showModal(`<div class="eyebrow">${game.index===1?'FAMILY REUNITED':'EXIT REACHED'}</div><h2>${game.index===1?'Well done, Willy!':'World '+String(game.index).padStart(2,'0')+' complete'}</h2><p>${game.index===1?'Mom and your sister are free. You have completed the adventure on Earth II.':'Exit card found and every collection goal completed.'}</p><p>${progress.done.length} of 24 original levels completed.</p><div class="panel-actions"><button id="nextHub" class="primary">To Space Station →</button><button id="again" class="secondary">Play Again</button></div>`);$('nextHub').onclick=()=>start(0);$('again').onclick=()=>start(game.index);}
+function introEnd(){if(mode!=='intro')return;$('intro').hidden=true;audioStart();home();}
+// The publisher screen is the untouched DIM.DAT image, shown at every launch.
+let introTimer=null;$('intro').querySelector('img').addEventListener('load',()=>{introTimer=setTimeout(introEnd,4500);});if($('intro').querySelector('img').complete)introTimer=setTimeout(introEnd,4500);
+ $('skipIntro').onclick=introEnd;$('intro').onclick=introEnd;
+ $('start').onclick=()=>start(0);$('continue').onclick=()=>start(progress.last);$('levelSelect').onclick=levels;$('settings').onclick=()=>{audioStart();options(false);};$('pause').onclick=()=>options(true);$('godQuick').onclick=toggleGod;$('musicQuick').onclick=toggleMusic;
+const pointers=new Map();
+document.querySelectorAll('[data-key]').forEach(b=>{
+ b.addEventListener('pointerdown',e=>{e.preventDefault();audioStart();b.setPointerCapture(e.pointerId);const k=b.dataset.key;pointers.set(e.pointerId,k);if(k==='jump'&&!keys.jump)jumpPress=true;if(k==='up'&&!keys.up)upPress=true;if(k==='shoot')shootPress=true;keys[k]=true;b.classList.add('pressed');});
+ const end=e=>{const k=pointers.get(e.pointerId);pointers.delete(e.pointerId);if(k&&!Array.from(pointers.values()).includes(k)){keys[k]=false;b.classList.remove('pressed');}};b.addEventListener('pointerup',end);b.addEventListener('pointercancel',end);b.addEventListener('lostpointercapture',end);
+});
+const keyMap={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowDown:'down',ArrowUp:'up',KeyW:'up',Space:'jump',KeyS:'shoot',KeyJ:'shoot',Comma:'left',Period:'right'};
+window.addEventListener('keydown',e=>{
+ if(mode==='intro'){introEnd();return;}
+ if(['Escape','KeyG','KeyM'].includes(e.code)&&!e.repeat){e.preventDefault();if(e.code==='KeyG')toggleGod();else if(e.code==='KeyM')toggleMusic();else if(mode==='play')options(true);else if(mode==='pause'||mode==='settings'||mode==='levels')resume();return;}
+ if(mode!=='play')return;const k=keyMap[e.code];if(k){e.preventDefault();audioStart();if(k==='jump'&&!keys.jump)jumpPress=true;if(k==='up'&&!keys.up)upPress=true;if(k==='shoot')shootPress=true;keys[k]=true;}
+});window.addEventListener('keyup',e=>{const k=keyMap[e.code];if(k){e.preventDefault();keys[k]=false;}});
+function pause(){if(mode==='play')options(true);resetInputs();persist();if(ac)ac.suspend();}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});window.addEventListener('blur',()=>{if(mode==='play')pause();});
+window.WillyApp={pause,back(){if(mode==='play')options(true);else if(mode==='intro')introEnd();else if(mode==='complete')home();else resume();}};
+function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,3);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);last=performance.now();acc=0;}window.addEventListener('resize',resize);resize();
+function frame(now){
+ const elapsed=Math.min(.075,(now-last)/1000||0);last=now;clock+=elapsed;if(toastTimer>0){toastTimer-=elapsed;if(toastTimer<=0)$('toast').style.opacity=0;}
+ if(mode==='play'){
+  acc+=elapsed;while(acc>=1/120){game.step(1/120,{...keys,jump:jumpPress,up:upPress,shoot:keys.shoot||shootPress});jumpPress=false;upPress=false;shootPress=false;acc-=1/120;
+   const events=game.events.splice(0);for(const e of events){sound(e.type);if(e.type==='enter'){start(e.index);break;}if(e.type==='complete'){finish();break;}if(e.type==='exitInfo')toast(exitMessage(e));if(e.type==='card')toast('Exit card found · '+exitMessage(game.exitStatus()));if(e.type==='unlock')toast('Lock opened');if(e.type==='lockedFinale')toast('The final level unlocks after the other 23 levels.');if(e.type==='respawn')toast('New attempt · The level starts over.');if(e.type==='forbidden')toast('Do not collect any cans or lollipops here! New attempt.');}
+   if(mode!=='play'){acc=0;break;}
+  }sync();
+ }
+ music();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#0b1423';ctx.fillRect(0,0,W,H);
+ if($('home').hidden&&mode!=='intro'){
+  const h=H-140,scale=Math.max(1,h/170),vw=W/scale,vh=h/scale;
+  const targetX=WillyEngine.clamp(game.player.x+6-vw/2,0,Math.max(0,640-vw)),targetY=WillyEngine.clamp(game.player.y+8-vh*.48,0,Math.max(0,384-vh));
+  const t=1-Math.exp(-elapsed*9);cam.x+=(targetX-cam.x)*t;cam.y+=(targetY-cam.y)*t;
+  WillyRenderer.draw(ctx,game,{x:0,y:57,w:W,h,scale,camX:cam.x,camY:cam.y},clock);
+ }
+ requestAnimationFrame(frame);
+}
+sync();requestAnimationFrame(frame);
+})();
