@@ -8,7 +8,7 @@ class Game {
  constructor(levels,options={}){this.levels=levels;this.god=!!options.god;this.gentle=!!options.gentle;this.done=options.done||[];this.events=[];this.load(0);}
  emit(type,data={}){this.events.push({type,...data});}
  load(index){
-  this.index=clamp(index,0,this.levels.length-1);this.level=this.levels[this.index];this.time=0;this.complete=false;this.events=[];this.shots=[];this.sparks=[];this.keys=[0,0,0];this.card=false;this.collected=0;this.cooldown=0;this.jumpBuffer=0;this.drop=0;this.doorCooldown=0;this.wasNearExit=false;
+  this.checkpoint=null;this.usedCheckpoint=false;this.retries=0;this.nearDoor=null;this.index=clamp(index,0,this.levels.length-1);this.level=this.levels[this.index];this.time=0;this.complete=false;this.events=[];this.shots=[];this.sparks=[];this.keys=[0,0,0];this.card=false;this.collected=0;this.cooldown=0;this.jumpBuffer=0;this.drop=0;this.doorCooldown=0;this.wasNearExit=false;
   this.items=this.level.items.map((i,id)=>({...i,id,w:16,h:16,taken:false}));
   this.enemies=this.level.enemies.map((e,id)=>({...e,id,alive:true,flash:0,dx:0,dy:0,dirX:[1,-1,0,0,1,-1,1,-1][e.direction]||0,dirY:[0,0,-1,1,-1,-1,1,1][e.direction]||0}));
   this.player={x:this.level.spawn.x+2,y:this.level.spawn.y,w:12,h:16,vx:0,vy:0,face:this.level.facing===12?1:-1,hp:this.gentle?6:4,invincible:1.4,grounded:false,coyote:0,ride:null};
@@ -16,6 +16,14 @@ class Game {
  setGod(on){this.god=!!on;this.emit('god');}
  setGentle(on){this.gentle=!!on;this.player.hp=Math.min(this.player.hp,this.gentle?6:4);}
  snapshot(){return {index:this.index};}
+ setCheckpoints(on){this.checkpoints=!!on;if(!on)this.checkpoint=null;}
+ saveCheckpoint(){
+  const p=this.player,body=this.playerBody();
+  const floor=this.tilesNear({x:p.x,y:p.y+p.h,w:p.w,h:1});
+  if(!this.checkpoints||!this.index||this.complete||!p.grounded||p.ride!==null||this.blocked(body)||!floor.some(t=>t.kind===1)||this.tilesNear({...body,x:body.x-8,y:body.y-8,w:body.w+16,h:body.h+17}).some(t=>t.kind===3)||this.enemies.some(e=>e.alive&&e.contact!==1&&overlap({...body,x:body.x-24,y:body.y-24,w:body.w+48,h:body.h+48},e)))return false;
+  this.checkpoint=JSON.parse(JSON.stringify({player:p,items:this.items,enemies:this.enemies,keys:this.keys,card:this.card,collected:this.collected}));
+  this.usedCheckpoint=true;this.emit('checkpoint');return true;
+ }
  exitStatus(){
   const remaining=Math.max(0,this.level.required-this.collected),missingCard=!this.card;
   if(!this.index)return {remaining,missingCard,ready:false,atDoor:false,near:false};
@@ -29,7 +37,12 @@ class Game {
   }
   return {remaining,missingCard,ready:!missingCard&&remaining===0,atDoor,near};
  }
- restart(){const n=this.index;this.load(n);this.emit('respawn');}
+ restart(){
+  const saved=this.checkpoints&&this.checkpoint,elapsed=this.time,retries=(this.retries||0)+1,used=this.usedCheckpoint;
+  this.load(this.index);this.time=elapsed;this.retries=retries;this.usedCheckpoint=used;
+  if(saved){const state=JSON.parse(JSON.stringify(saved));Object.assign(this,state);this.checkpoint=saved;Object.assign(this.player,{hp:this.gentle?6:4,invincible:2,vx:0,vy:0,ride:null});}
+  this.emit('respawn',{checkpoint:!!saved});
+ }
  hurt(fatal=false){
   const p=this.player;if(this.god||p.invincible>0)return;
   p.hp=fatal?0:p.hp-1;p.invincible=this.gentle?1.8:1.15;this.emit('hurt');
