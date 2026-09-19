@@ -1,6 +1,6 @@
 'use strict';
-const CACHE='little-willy-2.6-web-1';
-const ASSETS=['./','./index.html','./style-v2.css','./levels.js','./art.js','./engine-v2.js','./renderer.js','./game-v2.js','./web-shell.js','./intro.png','./title-original.png','./finale-original.png','./materials-hd.png','./manifest.webmanifest','./favicon.svg'];
+const CACHE='little-willy-2.7-web-1';
+const ASSETS=['./','./index.html','./style-v2.css','./levels.js','./art.js','./engine-v2.js','./renderer.js','./game-v2.js','./web-shell.js','./soundtrack.js','./intro.png','./title-original.png','./finale-original.png','./materials-hd.png','./manifest.webmanifest','./favicon.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
