@@ -1,9 +1,9 @@
-LITTLE WILLY – NETLIFY WEB EDITION 2.6
+LITTLE WILLY – NETLIFY WEB EDITION 2.8
 
 SCHNELLSTART MIT NETLIFY DROP
 1. Bei https://app.netlify.com/ anmelden.
 2. https://app.netlify.com/drop öffnen.
-3. Little-Willy-Netlify-v2.6.zip direkt in das Feld ziehen. Alternativ das ZIP entpacken und den entpackten Ordner hineinziehen.
+3. Little-Willy-Netlify-v2.8.zip direkt in das Feld ziehen. Alternativ das ZIP entpacken und den entpackten Ordner hineinziehen.
 4. Nach dem Hochladen zeigt Netlify die öffentliche Adresse mit der Endung netlify.app an.
 
 Das Paket ist bereits fertig gebaut. Es gibt keinen Build-Befehl, keine Abhängigkeiten, kein PHP und keine Datenbank. index.html liegt direkt im veröffentlichten Ordner.
@@ -46,3 +46,6 @@ Validation: 34 Node tests pass, including state restoration, reset behaviour, fi
 
 ## Web version 2.7 — soundtrack
 User-supplied Suno songs: Little Willy Theme (menu), Space Station (hub), Crystal Caves (ice levels 02 and 17). Other worlds retain synthesized themes. Music is switchable separately from effects. Tracks are MP3 160 kbps stereo, normalized to -19 LUFS with gentle boundary fades; these are whole-song repeats, not beat-matched seamless loops. Tracks load on demand and are available offline after successful loading. Downloaded WAV masters are untouched. Android APK remains 2.5.
+
+## Web version 2.8 — complete soundtrack
+Eight additional Suno songs cover sandstone ruins, lava worlds, alien and lunar worlds, the golden labyrinth, neon stations and laboratories, the final prison and the ending. Every map now has recorded music. Little Victory plays once after a completed level; Home Together follows it after the finale. Music remains independently switchable and loads on demand. WAV masters are untouched. Android APK remains 2.5.
