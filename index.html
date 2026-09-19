@@ -13,15 +13,16 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="title-original.png">
 <link rel="stylesheet" href="style-v2.css">
+<link rel="stylesheet" href="home-v29.css">
 </head>
 <body>
 <canvas id="scene" aria-label="Little Willy game area"></canvas>
 <div id="intro" class="intro-screen"><img src="intro.png" alt="Original startup screen: Dimension16 I. Mustun – M.B. Soft presents"><button id="skipIntro">Continue ▸</button></div>
 <main id="home" class="home overlay" hidden>
- <div class="poster"><img src="title-original.png" alt="Original title: Little Willy – Where is mama?"></div>
- <div class="home-copy"><div class="eyebrow">EARTH II · THE ORIGINAL ADVENTURE</div><h1>Little Willy<span>Back on Earth II.</span></h1><p>Explore the space station and its alien worlds.<br>Find the exit cards. Rescue Mom and your sister.</p>
- <div class="home-buttons"><button id="recommended" class="primary">Start here · World 02 →</button><button id="start" class="secondary">Enter Space Station <span>→</span></button><button id="continue" class="secondary" hidden>Resume Level</button><button id="levelSelect" class="secondary">Choose Worlds</button><button id="settings" class="secondary">Settings</button><button id="installWeb" class="secondary" hidden>Install App</button></div>
- <div class="home-notes">24 original maps · HD artwork · Shooting · Full soundtrack · v2.8</div><div class="credits">Based on the game by I. Mustun · Dimension16 / M.B. Soft</div></div>
+ <img class="hero-art" src="hero-adventure.png" alt="Willy leaps through a colourful alien world with crystals, candy and a space station"><div class="hero-shade"></div><div class="home-top"><span>THE 1993 ADVENTURE. A NEW SPARK.</span><span>✦ EARTH II</span></div>
+ <div class="home-copy"><div class="eyebrow hero-tag">SMALL HERO. BIG TROUBLE.</div><h1>Little<br><em>Willy</em><span>Mom’s missing. Adventure’s calling.</span></h1><p>Jump into 24 strange worlds. Blast past aliens.<br>Grab a treat. Find the card. Bring your family home.</p>
+ <div class="home-buttons"><button id="recommended" class="primary">Let’s play! <span>▶</span></button><button id="start" class="secondary">Enter Space Station <span>→</span></button><button id="continue" class="secondary" hidden>Resume Level</button><button id="levelSelect" class="secondary">Choose Worlds</button><button id="settings" class="secondary">Settings</button><button id="installWeb" class="secondary" hidden>Install App</button></div>
+ <div class="home-records"><div><strong id="homeScore">0</strong><span>PERSONAL HIGH SCORE</span></div><div><strong id="homeProgress">0 / 24</strong><span>WORLDS EXPLORED</span></div></div><div class="score-help">100 points per treat · Your best finished scores, saved on this device.<br>Assisted record: <span id="homeAssisted">0</span> · God Mode, checkpoints or gentler difficulty.</div><div class="home-notes">NO SIGN-UP · PLAY YOUR WAY · v2.9</div><div class="credits">Based on the game by I. Mustun · Dimension16 / M.B. Soft</div></div>
 </main>
 <div id="hud" hidden>
  <div class="topbar"><div class="level-info"><span id="levelNumber" class="eyebrow"></span><strong id="levelTitle"></strong></div><div class="vitals"><span id="hearts"></span><span id="goals"></span></div><div class="top-actions"><button id="fullscreen" class="pill" aria-label="Full screen">⛶</button><button id="musicQuick" class="pill" aria-label="Toggle music">♫</button><button id="godQuick" class="pill">God: off</button><button id="checkpointQuick" class="pill" hidden aria-label="Save checkpoint">⚑ Save</button><button id="pause" class="pill" aria-label="Pause">Ⅱ</button></div></div>

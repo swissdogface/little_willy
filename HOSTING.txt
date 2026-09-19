@@ -1,4 +1,6 @@
-LITTLE WILLY – NETLIFY WEB EDITION 2.8
+LITTLE WILLY – NETLIFY WEB EDITION 2.9
+
+VERSION 2.9: New illustrated adventure home screen. Cans and lollipops are optional in ALL worlds, including World 20. Each awards 100 points. Only the exit card is required to finish. The personal high score sums your best completed run per world, stored on this device. Assisted runs (God Mode, gentler difficulty or checkpoints enabled during the run) have a separate record. Death and checkpoint restoration also restore the current pickup count. Existing world completion progress is preserved. Android remains version 2.8.
 
 SCHNELLSTART MIT NETLIFY DROP
 1. Bei https://app.netlify.com/ anmelden.

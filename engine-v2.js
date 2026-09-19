@@ -25,7 +25,7 @@ class Game {
   this.usedCheckpoint=true;this.emit('checkpoint');return true;
  }
  exitStatus(){
-  const remaining=Math.max(0,this.level.required-this.collected),missingCard=!this.card;
+  const remaining=0,missingCard=!this.card;
   if(!this.index)return {remaining,missingCard,ready:false,atDoor:false,near:false};
   const door={...this.level.exit,w:16,h:32},body=this.playerBody();
   // A short reach beside the door makes the button usable without pixel-perfect
@@ -129,7 +129,6 @@ class Game {
   for(const i of this.items){
    if(i.taken||i.kind===2||!overlap(p,{...i,x:i.x+2,y:i.y+2,w:12,h:12}))continue;
    if(i.kind===0){
-    if(this.level.required===0){i.taken=true;this.emit('forbidden');this.restart();this.emit('forbidden');return;}
     this.collected++;
    }else if(i.kind===1)this.keys[i.sprite-81]++;
    else if(i.kind===3)this.card=true;
