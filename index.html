@@ -17,12 +17,12 @@
 </head>
 <body>
 <canvas id="scene" aria-label="Little Willy game area"></canvas>
-<div id="intro" class="intro-screen"><img src="intro.png" alt="Original startup screen: Dimension16 I. Mustun – M.B. Soft presents"><button id="skipIntro">Continue ▸</button></div>
-<main id="home" class="home overlay" hidden>
+<main id="home" class="home overlay">
  <img class="hero-art" src="hero-adventure.png" alt="Willy leaps through a colourful alien world with crystals, candy and a space station"><div class="hero-shade"></div><div class="home-top"><span>THE 1993 ADVENTURE. A NEW SPARK.</span><span>✦ EARTH II</span></div>
  <div class="home-copy"><div class="eyebrow hero-tag">SMALL HERO. BIG TROUBLE.</div><h1>Little<br><em>Willy</em><span>Mom’s missing. Adventure’s calling.</span></h1><p>Jump into 24 strange worlds. Blast past aliens.<br>Grab a treat. Find the card. Bring your family home.</p>
  <div class="home-buttons"><button id="recommended" class="primary">Let’s play! <span>▶</span></button><button id="start" class="secondary">Enter Space Station <span>→</span></button><button id="continue" class="secondary" hidden>Resume Level</button><button id="levelSelect" class="secondary">Choose Worlds</button><button id="settings" class="secondary">Settings</button><button id="installWeb" class="secondary" hidden>Install App</button></div>
  <div class="home-records"><div><strong id="homeScore">0</strong><span>PERSONAL HIGH SCORE</span></div><div><strong id="homeProgress">0 / 24</strong><span>WORLDS EXPLORED</span></div></div><div class="score-help">100 points per treat · Your best finished scores, saved on this device.<br>Assisted record: <span id="homeAssisted">0</span> · God Mode, checkpoints or gentler difficulty.</div><div class="home-notes">NO SIGN-UP · PLAY YOUR WAY · v2.9</div><div class="credits">Based on the game by I. Mustun · Dimension16 / M.B. Soft</div></div>
+ <div class="publisher-logos" aria-label="Original creators"><span>ORIGINAL BY</span><svg viewBox="0 12 140 69" role="img" aria-label="Dimension 16 · I. Mustun"><image href="intro.png" width="320" height="200"/></svg><svg viewBox="195 17 101 60" role="img" aria-label="M.B. Soft"><image href="intro.png" width="320" height="200"/></svg></div>
 </main>
 <div id="hud" hidden>
  <div class="topbar"><div class="level-info"><span id="levelNumber" class="eyebrow"></span><strong id="levelTitle"></strong></div><div class="vitals"><span id="hearts"></span><span id="goals"></span></div><div class="top-actions"><button id="fullscreen" class="pill" aria-label="Full screen">⛶</button><button id="musicQuick" class="pill" aria-label="Toggle music">♫</button><button id="godQuick" class="pill">God: off</button><button id="checkpointQuick" class="pill" hidden aria-label="Save checkpoint">⚑ Save</button><button id="pause" class="pill" aria-label="Pause">Ⅱ</button></div></div>

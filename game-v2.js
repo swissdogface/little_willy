@@ -89,10 +89,8 @@ function finish(){
  $('nextHub').onclick=()=>start(0);$('again').onclick=()=>start(game.index);
  $('shareWin').onclick=async()=>{try{if(navigator.share){await navigator.share({title:'Little Willy · World '+number+' complete',text:message,url});return;}if(navigator.clipboard){await navigator.clipboard.writeText(message);$('shareStatus').textContent='Achievement and link copied!';return;}}catch(e){if(e.name==='AbortError')return;}const field=$('shareText');field.hidden=false;field.value=message;field.focus();field.select();$('shareStatus').textContent='Copy this message to share your adventure.';};
 }
-function introEnd(){if(mode!=='intro')return;$('intro').hidden=true;audioStart();home();const shared=Number(new URLSearchParams(location.search).get('world'));if(Number.isInteger(shared)&&shared>=2&&shared<=24){$('recommended').textContent='Play shared World '+String(shared).padStart(2,'0')+' →';$('recommended').onclick=()=>start(shared);}}
-// The publisher screen is the untouched DIM.DAT image, shown at every launch.
-let introTimer=null;$('intro').querySelector('img').addEventListener('load',()=>{introTimer=setTimeout(introEnd,4500);});if($('intro').querySelector('img').complete)introTimer=setTimeout(introEnd,4500);
- $('skipIntro').onclick=introEnd;$('intro').onclick=introEnd;
+function introEnd(){if(mode!=='intro')return;home();const shared=Number(new URLSearchParams(location.search).get('world'));if(Number.isInteger(shared)&&shared>=2&&shared<=24){$('recommended').textContent='Play shared World '+String(shared).padStart(2,'0')+' →';$('recommended').onclick=()=>start(shared);}}
+// Start directly on the illustrated home screen; audio begins on interaction.
  $('start').onclick=()=>start(0);$('recommended').onclick=()=>start(2);$('checkpointQuick').onclick=savePoint;$('continue').onclick=()=>start(progress.last);$('levelSelect').onclick=levels;$('settings').onclick=()=>{audioStart();options(false);};$('pause').onclick=()=>options(true);$('godQuick').onclick=toggleGod;$('musicQuick').onclick=toggleMusic;
 const pointers=new Map();
 document.querySelectorAll('[data-key]').forEach(b=>{
@@ -126,5 +124,5 @@ function frame(now){
  }
  requestAnimationFrame(frame);
 }
-sync();requestAnimationFrame(frame);
+introEnd();sync();requestAnimationFrame(frame);
 })();
