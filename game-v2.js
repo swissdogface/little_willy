@@ -19,7 +19,7 @@ const melodies=[
  [0,7,3,10,12,10,7,3,5,12,8,7,3,2,0,-1]
 ];
 function persist(){try{localStorage.setItem('willy-v2-prefs',JSON.stringify(prefs));localStorage.setItem('willy-v2-progress',JSON.stringify(progress));}catch(e){}}
-function audioStart(){try{if(!ac){ac=new(window.AudioContext||window.webkitAudioContext)();musicBus=ac.createGain();musicBus.gain.value=prefs.music?.12:0;musicBus.connect(ac.destination);fxBus=ac.createGain();fxBus.gain.value=.12;fxBus.connect(ac.destination);nextBeat=ac.currentTime;}if(ac.state==='suspended')ac.resume();if(prefs.music&&window.WillySoundtrack)window.WillySoundtrack.preload(ac,'victory');}catch(e){}}
+function audioStart(){try{if(!ac){ac=new(window.AudioContext||window.webkitAudioContext)();musicBus=ac.createGain();musicBus.gain.value=prefs.music?.12:0;musicBus.connect(ac.destination);fxBus=ac.createGain();fxBus.gain.value=.12;fxBus.connect(ac.destination);nextBeat=ac.currentTime;}if(ac.state==='suspended')ac.resume().catch(()=>{});if(prefs.music&&window.WillySoundtrack){window.WillySoundtrack.preload(ac,'theme');window.WillySoundtrack.preload(ac,'victory');}}catch(e){}}
 function note(freq,t,length,volume,type,bus){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(volume,t+.008);g.gain.exponentialRampToValueAtTime(.001,t+length);o.connect(g);g.connect(bus);o.start(t);o.stop(t+length+.02);o.onended=()=>{o.disconnect();g.disconnect();};}
 function music(){
  if(ac&&window.WillySoundtrack){const track=window.WillySoundtrack.select(mode,game.index,game.level.theme);if(window.WillySoundtrack.update(ac,musicBus,track,prefs.music&&!document.hidden&&mode!=='pause'&&mode!=='intro'&&ac.state==='running'))return;}
@@ -49,10 +49,12 @@ function resetInputs(){keys={};jumpPress=false;upPress=false;shootPress=false;do
 function sync(){
  $('homeScore').textContent=totalBest('best').toLocaleString('en-US');$('homeAssisted').textContent=totalBest('assistedBest').toLocaleString('en-US');$('homeProgress').textContent=progress.done.length+' / 24';
  $('levelNumber').textContent=game.index?'ORIGINAL MAP · '+String(game.index).padStart(2,'0'):'EARTH II · '+progress.done.length+' / 24 COMPLETED';$('levelTitle').textContent=game.level.name;
- $('hearts').textContent=prefs.god?'∞ INVINCIBLE':'♥'.repeat(Math.max(0,game.player.hp));
- $('goals').textContent=game.index?`Score ${game.collected*100} · Card ${game.card?'✓':'–'}`:'Choose a door';
+ $('hearts').textContent=prefs.god?'∞':'♥'.repeat(Math.max(0,game.player.hp));
+ const mins=Math.floor(game.time/60),secs=String(Math.floor(game.time%60)).padStart(2,'0');$('timeInfo').textContent=mins+':'+secs;
+ $('scoreInfo').textContent=(game.collected*100).toLocaleString('en-US');
  $('godQuick').textContent='God: '+(prefs.god?'on':'off');$('godQuick').setAttribute('aria-pressed',String(prefs.god));$('musicQuick').textContent=prefs.music?'♫ On':'♫ Off';$('musicQuick').setAttribute('aria-pressed',String(prefs.music));
- $('keysInfo').textContent=game.keys.map((n,i)=>(['🟢','🔴','🟡'][i])+' '+n).join('  ');
+ $('keysInfo').innerHTML=game.keys.map((n,i)=>`<span class="key-count key-${['green','red','yellow'][i]}" aria-label="${['Green','Red','Yellow'][i]} keys: ${n}"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="6" cy="6" r="3.4"/><path d="M8.6 8.5 16 16m-3.1-3.1 2.8-2.8m-1.4 4.2 2.8-2.8"/></svg><b>${n}</b></span>`).join('');
+ $('exitInfo').innerHTML=game.card?'<span class="exit-card-token">EXIT</span><b>✓</b>':'<span class="exit-card-token empty">EXIT</span><b>–</b>';
  const exit=game.exitStatus();$('enterDoor').hidden=false;$('enterDoor').textContent=game.index?'EXIT ↑':'DOOR ↑';$('enterDoor').setAttribute('aria-label',game.index?'Open exit':'Enter door');$('enterDoor').classList.toggle('exit-ready',!!game.index&&exit.ready&&exit.near);
  const completedDoor=game.nearDoor&&game.done.includes(game.nearDoor.id);$('hint').textContent=game.index?exitMessage(exit):(game.nearDoor?'Door '+String(game.nearDoor.id).padStart(2,'0')+(completedDoor?' · COMPLETED ✓ · Press ↑ to replay':' · Press ↑ to enter'):'Walk to a door · Press ↑ to enter');
  $('continue').hidden=!progress.last;$('continue').textContent='Play Level '+String(progress.last).padStart(2,'0')+' again';
@@ -90,7 +92,10 @@ function finish(){
  $('shareWin').onclick=async()=>{try{if(navigator.share){await navigator.share({title:'Little Willy · World '+number+' complete',text:message,url});return;}if(navigator.clipboard){await navigator.clipboard.writeText(message);$('shareStatus').textContent='Achievement and link copied!';return;}}catch(e){if(e.name==='AbortError')return;}const field=$('shareText');field.hidden=false;field.value=message;field.focus();field.select();$('shareStatus').textContent='Copy this message to share your adventure.';};
 }
 function introEnd(){if(mode!=='intro')return;home();const shared=Number(new URLSearchParams(location.search).get('world'));if(Number.isInteger(shared)&&shared>=2&&shared<=24){$('recommended').textContent='Play shared World '+String(shared).padStart(2,'0')+' →';$('recommended').onclick=()=>start(shared);}}
-// Start directly on the illustrated home screen; audio begins on interaction.
+// Try autoplay on load; retain gesture recovery when the browser blocks sound.
+document.addEventListener('pointerdown',()=>audioStart(),{once:true,capture:true});
+document.addEventListener('click',()=>audioStart(),{once:true,capture:true});
+document.addEventListener('keydown',()=>audioStart(),{once:true,capture:true});
  $('start').onclick=()=>start(0);$('recommended').onclick=()=>start(2);$('checkpointQuick').onclick=savePoint;$('continue').onclick=()=>start(progress.last);$('levelSelect').onclick=levels;$('settings').onclick=()=>{audioStart();options(false);};$('pause').onclick=()=>options(true);$('godQuick').onclick=toggleGod;$('musicQuick').onclick=toggleMusic;
 const pointers=new Map();
 document.querySelectorAll('[data-key]').forEach(b=>{
@@ -117,12 +122,12 @@ function frame(now){
  }
  music();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#0b1423';ctx.fillRect(0,0,W,H);
  if($('home').hidden&&mode!=='intro'){
-  const h=H-140,scale=Math.max(1,h/170),vw=W/scale,vh=h/scale;
+  const hudTop=H<=440?66:72,hintBand=H<=440?34:36,h=H-hudTop-hintBand-83,scale=Math.max(1,h/170),vw=W/scale,vh=h/scale;
   const targetX=WillyEngine.clamp(game.player.x+6-vw/2,0,Math.max(0,640-vw)),targetY=WillyEngine.clamp(game.player.y+8-vh*.48,0,Math.max(0,384-vh));
   const t=1-Math.exp(-elapsed*9);cam.x+=(targetX-cam.x)*t;cam.y+=(targetY-cam.y)*t;
-  WillyRenderer.draw(ctx,game,{x:0,y:57,w:W,h,scale,camX:cam.x,camY:cam.y},clock);
+  WillyRenderer.draw(ctx,game,{x:0,y:hudTop+hintBand,w:W,h,scale,camX:cam.x,camY:cam.y},clock);
  }
  requestAnimationFrame(frame);
 }
-introEnd();sync();requestAnimationFrame(frame);
+introEnd();sync();if(prefs.music)audioStart();requestAnimationFrame(frame);
 })();

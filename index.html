@@ -12,6 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="title-original.png">
+<link rel="preload" href="music-little-willy-theme.mp3" as="audio" type="audio/mpeg" fetchpriority="high">
 <link rel="stylesheet" href="style-v2.css">
 <link rel="stylesheet" href="home-v29.css">
 </head>
@@ -25,9 +26,9 @@
  <div class="publisher-logos" aria-label="Original creators"><span>ORIGINAL BY</span><svg viewBox="0 12 140 69" role="img" aria-label="Dimension 16 · I. Mustun"><image href="intro.png" width="320" height="200"/></svg><svg viewBox="195 17 101 60" role="img" aria-label="M.B. Soft"><image href="intro.png" width="320" height="200"/></svg></div>
 </main>
 <div id="hud" hidden>
- <div class="topbar"><div class="level-info"><span id="levelNumber" class="eyebrow"></span><strong id="levelTitle"></strong></div><div class="vitals"><span id="hearts"></span><span id="goals"></span></div><div class="top-actions"><button id="fullscreen" class="pill" aria-label="Full screen">⛶</button><button id="musicQuick" class="pill" aria-label="Toggle music">♫</button><button id="godQuick" class="pill">God: off</button><button id="checkpointQuick" class="pill" hidden aria-label="Save checkpoint">⚑ Save</button><button id="pause" class="pill" aria-label="Pause">Ⅱ</button></div></div>
+ <div class="topbar"><div class="level-info"><span id="levelNumber" class="eyebrow"></span><strong id="levelTitle"></strong></div><div class="vitals"><div class="stat health"><small>HEALTH</small><span id="hearts"></span></div><div class="stat"><small>TIME</small><strong id="timeInfo">0:00</strong></div><div class="stat"><small>SCORE</small><strong id="scoreInfo">0</strong></div><div class="stat keys"><small>KEYS</small><span id="keysInfo"></span></div><div class="stat exit-card"><small>EXIT CARD</small><span id="exitInfo">–</span></div></div><div class="top-actions"><button id="fullscreen" class="pill" aria-label="Full screen">⛶</button><button id="musicQuick" class="pill" aria-label="Toggle music">♫</button><button id="godQuick" class="pill">God: off</button><button id="checkpointQuick" class="pill" hidden aria-label="Save checkpoint">⚑ Save</button><button id="pause" class="pill" aria-label="Pause">Ⅱ</button></div></div>
  <div id="hint"></div><div id="toast" role="status"></div>
- <div class="controls"><div class="move"><button data-key="left" aria-label="Move left">◀</button><button data-key="right" aria-label="Move right">▶</button><button data-key="down" class="small" aria-label="Drop through platform">↓</button></div><div id="keysInfo"></div><div class="actions"><button data-key="up" id="enterDoor" class="small" aria-label="Enter door">DOOR ↑</button><button data-key="shoot" class="shoot" aria-label="Shoot">●<small>SHOOT</small></button><button data-key="jump" class="jump" aria-label="Jump">↑<small>JUMP</small></button></div></div>
+ <div class="controls"><div class="move"><button data-key="left" aria-label="Move left">◀</button><button data-key="right" aria-label="Move right">▶</button><button data-key="down" class="small" aria-label="Drop through platform">↓</button></div><div class="actions"><button data-key="up" id="enterDoor" class="small" aria-label="Enter door">DOOR ↑</button><button data-key="shoot" class="shoot" aria-label="Shoot">●<small>SHOOT</small></button><button data-key="jump" class="jump" aria-label="Jump">↑<small>JUMP</small></button></div></div>
 </div>
 <div id="modal" class="overlay modal" hidden><section id="panel" class="panel"></section></div>
 <div id="rotate">Please rotate your device to landscape ↻</div>
