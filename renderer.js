@@ -133,7 +133,7 @@ function worldEnemy(g,level,id,x,y,alpha,flip=false){
  // Unmapped artwork uses its original contours, including every animation frame.
  return false;
 }
-function sprite(g,level,id,x,y,flip=false,alpha=1){if(hd&&id>=80&&iceSprite(g,id,x,y,alpha))return;if(hd&&worldEnemy(g,level,id,x,y,alpha,flip))return;const ref=level.spriteMap[id];if(!ref)return;const d=WILLY_ART.sprites[ref[0]]?.[ref[1]];if(!d)return;const im=renderShape(d,'s'+ref.join(':'));g.save();g.globalAlpha=alpha;if(flip){g.translate(x+d.w-8,y);g.scale(-1,1);g.drawImage(im,0,0,d.w,d.h);}else g.drawImage(im,x,y,d.w,d.h);g.restore();}
+function sprite(g,level,id,x,y,flip=false,alpha=1,time=0,entity=null){if(hd&&window.WillyModernArt?.sprite(g,level,id,x,y,flip,alpha,time,entity))return;if(hd&&id>=80&&iceSprite(g,id,x,y,alpha))return;if(hd&&worldEnemy(g,level,id,x,y,alpha,flip))return;const ref=level.spriteMap[id];if(!ref)return;const d=WILLY_ART.sprites[ref[0]]?.[ref[1]];if(!d)return;const im=renderShape(d,'s'+ref.join(':'));g.save();g.globalAlpha=alpha;if(flip){g.translate(x+d.w-8,y);g.scale(-1,1);g.drawImage(im,0,0,d.w,d.h);}else g.drawImage(im,x,y,d.w,d.h);g.restore();}
 let map=null,mapId='',finale=new Image();finale.src='finale-original.png';
 const materials=new Image();materials.src='materials-hd.png';materials.onload=()=>{mapId='';};
 const iceBackdrop=new Image();iceBackdrop.src='ice-caves-backdrop.png';iceBackdrop.onload=()=>{mapId='';};
@@ -312,6 +312,7 @@ function completionBadge(g,x,y,time){
 }
 function hero(g,p,time,shooting,god,level){
  if(!hd){sprite(g,level,(p.face<0?0:12)+(p.grounded&&Math.abs(p.vx)>1?Math.floor(time*15)%8:0),p.x-2,p.y);return;}
+ if(window.WillyModernArt?.hero(g,p,time,shooting,god))return;
  g.save();g.translate(p.x+6,p.y+9.8);g.scale(.78,.78);if(p.face<0)g.scale(-1,1);
  if(p.invincible>0&&!god&&Math.floor(time*14)%2===0)g.globalAlpha=.55;
  const run=p.grounded&&Math.abs(p.vx)>1?Math.sin(time*19):0,outline='#243140';
@@ -341,7 +342,7 @@ function pickupHeart(g,x,y,time){
 function draw(g,game,view,time){
  prepare(game.level);g.save();g.beginPath();g.rect(view.x,view.y,view.w,view.h);g.clip();g.fillStyle='#08101c';g.fillRect(view.x,view.y,view.w,view.h);g.translate(view.x-view.camX*view.scale,view.y-view.camY*view.scale);g.scale(view.scale,view.scale);g.imageSmoothingEnabled=hd;
  if(map)g.drawImage(map,0,0,640,384);
- for(const e of game.level.extras)sprite(g,game.level,e.sprite,e.x,e.y);
+ for(const e of game.level.extras)sprite(g,game.level,e.sprite,e.x,e.y,false,1,time);
  for(const d of game.level.doors){
   const done=game.done.includes(d.id),near=game.nearDoor?.id===d.id;
   if(hd&&game.level.theme==='LMAIN'){
@@ -355,7 +356,7 @@ function draw(g,game,view,time){
  for(const e of game.enemies){
   if(!e.alive)continue;const period=e.animation.reduce((a,f)=>a+f[0],0);let t=Math.floor(time*12)%period,frame=e.animation[0][1];for(const f of e.animation){frame=f[1];if(t<f[0])break;t-=f[0];}
   const turnBoy=game.level.theme==='L04'&&frame>=52&&frame<=59;
-  sprite(g,game.level,frame,e.x,e.y,turnBoy&&e.dirX<0,e.flash>0?.45:1);
+  sprite(g,game.level,frame,e.x,e.y,turnBoy&&e.dirX<0,e.flash>0?.45:1,time,e);
   if(e.contact===1&&hd){g.strokeStyle='rgba(216,255,255,.8)';g.lineWidth=.35;g.beginPath();g.moveTo(e.x,e.y);g.lineTo(e.x+e.w,e.y);g.stroke();}
  }
  if(game.checkpoint){const p=game.checkpoint.player;g.strokeStyle='#7aefbc';g.lineWidth=1;g.beginPath();g.moveTo(p.x+6,p.y+16);g.lineTo(p.x+6,p.y-4);g.stroke();g.fillStyle='#7aefbc';g.beginPath();g.moveTo(p.x+6,p.y-4);g.lineTo(p.x+16,p.y);g.lineTo(p.x+6,p.y+4);g.fill();}
