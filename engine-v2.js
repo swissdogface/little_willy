@@ -76,7 +76,7 @@ class Game {
   p.x=dx>0?Math.min(...hits.map(t=>t.x-p.w)):Math.max(...hits.map(t=>t.x+t.w));p.vx=0;
  }
  moveY(dy,oldFeet){
-  const p=this.player;p.y+=dy;p.grounded=false;p.ride=null;
+  const p=this.player,oldY=p.y,wasGrounded=p.grounded;p.y+=dy;p.grounded=false;p.ride=null;
   const surfaces=this.tilesNear(this.playerBody()).concat(this.enemies.filter(e=>e.alive&&e.contact===1).map(e=>({...e,kind:2,platform:e})));
   let floor=null;
   for(const t of surfaces){
@@ -84,6 +84,17 @@ class Game {
    if(dy>=0&&oldFeet<=t.y+Math.max(1,t.platform?Math.abs(t.platform.dy)+1:1)&&!(t.kind===2&&this.drop>0)){
     if(!floor||t.y<floor.y)floor=t;
    }else if(dy<0&&t.kind===1){p.y=Math.max(p.y,t.y+t.h-HEAD_INSET);p.vy=0;}
+  }
+  // A falling body may miss a shaft by a few pixels. Slide past the lip only
+  // when both the sideways sweep and the complete downward path are clear.
+  if(floor&&floor.kind===1&&dy>0&&!wasGrounded){
+   const candidates=[floor.x-p.w,floor.x+floor.w].filter(x=>x>=0&&x+p.w<=640&&Math.abs(x-p.x)<=4&&(!p.vx||(x-p.x)*p.vx>=0)).sort((a,b)=>Math.abs(a-p.x)-Math.abs(b-p.x));
+   for(const x of candidates){
+    const sideways={...this.playerBody(Math.min(x,p.x),oldY),w:p.w+Math.abs(x-p.x)},downward={...this.playerBody(x,oldY),h:p.h-HEAD_INSET+dy};
+    if(this.blocked(sideways)||this.tilesNear(downward).some(t=>overlap(downward,t)))continue;
+    if(this.enemies.some(e=>e.alive&&e.contact===1&&overlap(downward,e)))continue;
+    p.x=x;floor=null;break;
+   }
   }
   if(floor){p.y=floor.y-p.h;p.vy=0;p.grounded=true;p.ride=floor.platform?floor.platform.id:null;if(floor.kind===3&&!this.god&&p.invincible<=0)return this.hurt(true);}
   if(p.y<0){p.y=0;p.vy=Math.max(0,p.vy);}

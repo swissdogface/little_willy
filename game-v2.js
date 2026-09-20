@@ -98,9 +98,19 @@ document.addEventListener('click',()=>audioStart(),{once:true,capture:true});
 document.addEventListener('keydown',()=>audioStart(),{once:true,capture:true});
  $('start').onclick=()=>start(0);$('recommended').onclick=()=>start(2);$('checkpointQuick').onclick=savePoint;$('continue').onclick=()=>start(progress.last);$('levelSelect').onclick=levels;$('settings').onclick=()=>{audioStart();options(false);};$('pause').onclick=()=>options(true);$('godQuick').onclick=toggleGod;$('musicQuick').onclick=toggleMusic;
 const pointers=new Map();
+// Slide a held steering finger between arrows without lifting it during a jump.
+function steerPointer(e){
+ const previous=pointers.get(e.pointerId);if(previous!=='left'&&previous!=='right')return;
+ const left=document.querySelector('[data-key="left"]'),right=document.querySelector('[data-key="right"]');
+ const a=left.getBoundingClientRect(),b=right.getBoundingClientRect();
+ const next=e.clientX<(a.right+b.left)/2?'left':'right';
+ if(next===previous)return;pointers.delete(e.pointerId);pointers.set(e.pointerId,next);
+ for(const k of ['left','right']){keys[k]=Array.from(pointers.values()).includes(k);document.querySelector('[data-key="'+k+'"]').classList.toggle('pressed',keys[k]);}
+}
 document.querySelectorAll('[data-key]').forEach(b=>{
  b.addEventListener('pointerdown',e=>{e.preventDefault();audioStart();b.setPointerCapture(e.pointerId);const k=b.dataset.key;pointers.set(e.pointerId,k);if(k==='jump'&&!keys.jump)jumpPress=true;if(k==='up'&&!keys.up)upPress=true;if(k==='shoot')shootPress=true;keys[k]=true;b.classList.add('pressed');});
- const end=e=>{const k=pointers.get(e.pointerId);pointers.delete(e.pointerId);if(k&&!Array.from(pointers.values()).includes(k)){keys[k]=false;b.classList.remove('pressed');}};b.addEventListener('pointerup',end);b.addEventListener('pointercancel',end);b.addEventListener('lostpointercapture',end);
+ b.addEventListener('pointermove',steerPointer);
+ const end=e=>{const k=pointers.get(e.pointerId);pointers.delete(e.pointerId);if(k&&!Array.from(pointers.values()).includes(k)){keys[k]=false;document.querySelector('[data-key="'+k+'"]').classList.remove('pressed');}};b.addEventListener('pointerup',end);b.addEventListener('pointercancel',end);b.addEventListener('lostpointercapture',end);
 });
 const keyMap={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowDown:'down',ArrowUp:'up',KeyW:'up',Space:'jump',KeyS:'shoot',KeyJ:'shoot',Comma:'left',Period:'right'};
 window.addEventListener('keydown',e=>{

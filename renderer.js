@@ -81,15 +81,63 @@ function iceSprite(g,id,x,y,alpha){
  }else {g.restore();return false;}
  g.restore();return true;
 }
-function worldEnemy(g,level,id,x,y,alpha){
- if(id<31||id>52)return false;const palette={L03:['#f3a64f','#5a3226','#ffe1a0'],L08:['#f0c34f','#5d4119','#fff1a8'],L04:['#f06c50','#49223a','#ffd28b'],L11:['#ff784d','#451c2d','#ffd08e'],L05:['#ec86d1','#51275d','#ffd1f7'],L07:['#74db9a','#1d5a5b','#cfffb9'],L06:['#66d9ff','#283c85','#d9fbff'],L13:['#7ee7ce','#225564','#e2fff5'],L09:['#a69ce7','#30345d','#e4ddff'],L10:['#c6e7f0','#49667c','#f3ffff'],LMAIN:['#65dbf5','#20476e','#e6fbff']}[level.theme]||['#7ee7ff','#254d75','#edffff'];const [main,dark,light]=palette;g.save();g.globalAlpha=alpha;g.translate(x,y);g.strokeStyle=dark;g.lineWidth=.7;
+function worldEnemy(g,level,id,x,y,alpha,flip=false){
+ // Complete eight-frame walking boy for Map 04. His neutral artwork faces right;
+ // the live horizontal velocity mirrors every frame when he turns left.
+ if(level.theme==='L04'&&id>=52&&id<=59){
+  const phase=(id-52)*Math.PI/4,stride=Math.sin(phase)*2.2,bob=Math.abs(Math.sin(phase))*.65;
+  g.save();g.globalAlpha=alpha;g.translate(x+14.5,y+14.5+bob);if(flip)g.scale(-1,1);g.translate(-14.5,-14.5);
+  const edge='#493426';g.lineCap='round';g.lineJoin='round';
+  // Warm, rounded Alpine outfit; the cross stays unobstructed in every pose.
+  g.strokeStyle='#f8e6bd';g.lineWidth=2.5;g.beginPath();g.moveTo(12,21);g.lineTo(10+stride,25);g.moveTo(17,21);g.lineTo(19-stride,25);g.stroke();
+  rounded(g,6.5+stride,24,7,3.2,1.4,'#875434',edge);rounded(g,15.5-stride,24,7,3.2,1.4,'#875434',edge);
+  g.strokeStyle='#e7b879';g.lineWidth=.55;g.beginPath();g.moveTo(9+stride,24.7);g.lineTo(11+stride,25);g.moveTo(18-stride,24.7);g.lineTo(20-stride,25);g.stroke();
+  rounded(g,9,18,11,5,1.8,'#69513d',edge);
+  g.strokeStyle='#fff2d9';g.lineWidth=3.4;g.beginPath();g.moveTo(9,14);g.lineTo(6-stride*.5,18);g.moveTo(20,14);g.lineTo(23+stride*.5,17.8);g.stroke();
+  ellipse(g,6-stride*.5,18.5,1.65,1.6,'#ffcc9c');ellipse(g,23+stride*.5,18.3,1.65,1.6,'#ffcc9c');
+  const vest=g.createLinearGradient(9,12,21,20);vest.addColorStop(0,'#ff6151');vest.addColorStop(.5,'#e93135');vest.addColorStop(1,'#a3192d');
+  rounded(g,8.5,11,13,10,3.5,vest,edge);
+  g.fillStyle='#fff8df';g.beginPath();g.moveTo(11,11);g.lineTo(14.7,13);g.lineTo(18.5,11);g.closePath();g.fill();
+  // Equal-armed Swiss flag cross, large enough to read at game scale.
+  g.fillStyle='#fffdf2';g.fillRect(13.8,13.7,2.3,6.1);g.fillRect(11.9,15.6,6.1,2.3);
+  const skin=g.createRadialGradient(16,6,1,16,8,6.5);skin.addColorStop(0,'#ffe6bf');skin.addColorStop(1,'#e9a275');
+  ellipse(g,16,7.5,6.2,5.7,skin);g.strokeStyle=edge;g.lineWidth=.6;g.stroke();
+  ellipse(g,11,8.1,1.6,2,'#ffc998');ellipse(g,21.3,8.4,1.8,1.5,'#ffd2a5');
+  ellipse(g,18.8,10,1.6,.8,'#ed9382');
+  g.fillStyle='#855333';g.beginPath();g.moveTo(10.3,4.8);g.quadraticCurveTo(14,2.8,17,4.1);g.lineTo(15.6,6.1);g.lineTo(14.4,5.3);g.lineTo(12.3,7);g.lineTo(11.8,9);g.lineTo(10.6,7.4);g.closePath();g.fill();
+  ellipse(g,18.3,7.3,1.15,1.55,'#fffdf0');ellipse(g,18.8,7.5,.55,.85,'#354b42');ellipse(g,18.95,7.15,.2,.28,'#fff');
+  g.strokeStyle='#79513b';g.lineWidth=.55;g.beginPath();g.moveTo(17.2,5.5);g.quadraticCurveTo(18.3,4.8,19.2,5.4);g.stroke();
+  g.fillStyle='#813e35';g.beginPath();g.moveTo(16.3,10);g.quadraticCurveTo(18.4,11.2,20.5,9.8);g.quadraticCurveTo(19,13.1,16.3,10);g.fill();
+  g.strokeStyle='#fff8e7';g.lineWidth=.55;g.beginPath();g.moveTo(17,10.5);g.quadraticCurveTo(18.5,11,19.6,10.35);g.stroke();
+  // Alpine felt hat with cream feather and red hatband.
+  const felt=g.createLinearGradient(10,1,19,5);felt.addColorStop(0,'#8fba73');felt.addColorStop(1,'#376644');
+  g.fillStyle=felt;g.strokeStyle=edge;g.lineWidth=.55;g.beginPath();g.moveTo(10,4.4);g.lineTo(12.3,.5);g.quadraticCurveTo(13,-.1,14.3,1.1);g.lineTo(17.8,.6);g.lineTo(20.6,4.8);g.closePath();g.fill();g.stroke();
+  rounded(g,10.3,3.2,10,1.7,.4,'#b82731');ellipse(g,15.4,5,8.4,1.25,felt);g.strokeStyle=edge;g.lineWidth=.45;g.stroke();
+  g.fillStyle='#fff4c9';g.beginPath();g.moveTo(11,3.6);g.quadraticCurveTo(6.5,2.4,7,-.1);g.quadraticCurveTo(10,-.4,11,3.6);g.fill();
+  g.strokeStyle='#b39661';g.lineWidth=.3;g.beginPath();g.moveTo(11,3.6);g.lineTo(7.7,.7);g.stroke();
+  g.restore();return true;
+ }
+ if(id<31||id>52)return false;
+ // The original eight-frame wheel in Map 04 is a rolling Swiss cheese.
+ if(level.theme==='L04'&&id>=36&&id<=43){
+  g.save();g.globalAlpha=alpha;g.translate(x+14,y+14);g.rotate((43-id)*Math.PI/4);
+  g.shadowColor='rgba(255,190,45,.55)';g.shadowBlur=3;
+  const rind=g.createRadialGradient(-4,-5,1,0,0,13);rind.addColorStop(0,'#fff2a1');rind.addColorStop(.58,'#f6c83d');rind.addColorStop(1,'#b96c12');
+  ellipse(g,0,0,12.2,12.2,rind);g.shadowBlur=0;g.strokeStyle='#5d3414';g.lineWidth=1;g.stroke();
+  g.strokeStyle='#ffe981';g.lineWidth=1.2;g.beginPath();g.arc(0,0,10.4,-2.75,-.45);g.stroke();
+  const holes=[[-4.8,-4.2,2.1],[4.3,-5.1,1.45],[5.1,2.7,2.25],[-3.2,5.1,1.55],[-6.5,1.5,1.15],[.4,-.2,1.35]];
+  for(const [hx,hy,hr] of holes){ellipse(g,hx,hy,hr,hr*.82,'#a96318');g.strokeStyle='#6f3c12';g.lineWidth=.35;g.stroke();ellipse(g,hx-.45,hy-.45,hr*.48,hr*.3,'#d99122');}
+  g.fillStyle='#fff6b2';g.beginPath();g.moveTo(-7.5,-8);g.quadraticCurveTo(-2,-12,3,-10.2);g.lineTo(1.7,-8.8);g.quadraticCurveTo(-3,-10.2,-6.5,-6.8);g.closePath();g.fill();
+  g.restore();return true;
+ }
+ const palette={L03:['#f3a64f','#5a3226','#ffe1a0'],L08:['#f0c34f','#5d4119','#fff1a8'],L04:['#f06c50','#49223a','#ffd28b'],L11:['#ff784d','#451c2d','#ffd08e'],L05:['#ec86d1','#51275d','#ffd1f7'],L07:['#74db9a','#1d5a5b','#cfffb9'],L06:['#66d9ff','#283c85','#d9fbff'],L13:['#7ee7ce','#225564','#e2fff5'],L09:['#a69ce7','#30345d','#e4ddff'],L10:['#c6e7f0','#49667c','#f3ffff'],LMAIN:['#65dbf5','#20476e','#e6fbff']}[level.theme]||['#7ee7ff','#254d75','#edffff'];const [main,dark,light]=palette;g.save();g.globalAlpha=alpha;g.translate(x,y);g.strokeStyle=dark;g.lineWidth=.7;
  if(id<=33){g.fillStyle=main;g.beginPath();g.ellipse(8,9,6.6,5.5,0,0,7);g.fill();g.stroke();g.fillStyle=light;g.beginPath();g.arc(5.5,8,1.7,0,7);g.arc(10.5,8,1.7,0,7);g.fill();g.fillStyle=dark;g.fillRect(5,7.5,1,1.5);g.fillRect(10,7.5,1,1.5);g.strokeStyle=light;g.beginPath();g.moveTo(3,13);g.lineTo(13,13);g.stroke();}
  else if(id<=41){g.fillStyle=main;g.beginPath();g.ellipse(5,8,5,3.5,-.5,0,7);g.ellipse(11,8,5,3.5,.5,0,7);g.fill();g.stroke();g.fillStyle=light;g.beginPath();g.ellipse(8,8,2,4.6,0,0,7);g.fill();}
  else if(id<=45){g.fillStyle=main;g.beginPath();g.moveTo(8,1);g.lineTo(14,14);g.lineTo(8,12);g.lineTo(2,14);g.closePath();g.fill();g.stroke();g.fillStyle=light;g.fillRect(7.3,5,1.4,4);}
  else{g.shadowColor=main;g.shadowBlur=4;ellipse(g,6,8,4.5,5.5,main);g.shadowBlur=0;ellipse(g,6,8,2.1,2.8,light);g.fillStyle=dark;g.fillRect(5.3,7.1,1.4,2.2);}
  g.restore();return true;
 }
-function sprite(g,level,id,x,y,flip=false,alpha=1){if(hd&&(level.theme==='L02'||id>=80)&&iceSprite(g,id,x,y,alpha))return;if(hd&&worldEnemy(g,level,id,x,y,alpha))return;const ref=level.spriteMap[id];if(!ref)return;const d=WILLY_ART.sprites[ref[0]]?.[ref[1]];if(!d)return;const im=renderShape(d,'s'+ref.join(':'));g.save();g.globalAlpha=alpha;if(flip){g.translate(x+d.w-8,y);g.scale(-1,1);g.drawImage(im,0,0,d.w,d.h);}else g.drawImage(im,x,y,d.w,d.h);g.restore();}
+function sprite(g,level,id,x,y,flip=false,alpha=1){if(hd&&(level.theme==='L02'||id>=80)&&iceSprite(g,id,x,y,alpha))return;if(hd&&worldEnemy(g,level,id,x,y,alpha,flip))return;const ref=level.spriteMap[id];if(!ref)return;const d=WILLY_ART.sprites[ref[0]]?.[ref[1]];if(!d)return;const im=renderShape(d,'s'+ref.join(':'));g.save();g.globalAlpha=alpha;if(flip){g.translate(x+d.w-8,y);g.scale(-1,1);g.drawImage(im,0,0,d.w,d.h);}else g.drawImage(im,x,y,d.w,d.h);g.restore();}
 let map=null,mapId='',finale=new Image();finale.src='finale-original.png';
 const materials=new Image();materials.src='materials-hd.png';materials.onload=()=>{mapId='';};
 const iceBackdrop=new Image();iceBackdrop.src='ice-caves-backdrop.png';iceBackdrop.onload=()=>{mapId='';};
@@ -255,7 +303,8 @@ function draw(g,game,view,time){
  for(const i of game.items)if(!i.taken)sprite(g,game.level,i.sprite,i.x,i.y);
  for(const e of game.enemies){
   if(!e.alive)continue;const period=e.animation.reduce((a,f)=>a+f[0],0);let t=Math.floor(time*12)%period,frame=e.animation[0][1];for(const f of e.animation){frame=f[1];if(t<f[0])break;t-=f[0];}
-  sprite(g,game.level,frame,e.x,e.y,false,e.flash>0?.45:1);
+  const turnBoy=game.level.theme==='L04'&&frame>=52&&frame<=59;
+  sprite(g,game.level,frame,e.x,e.y,turnBoy&&e.dirX<0,e.flash>0?.45:1);
   if(e.contact===1&&hd){g.strokeStyle='rgba(216,255,255,.8)';g.lineWidth=.35;g.beginPath();g.moveTo(e.x,e.y);g.lineTo(e.x+e.w,e.y);g.stroke();}
  }
  if(game.checkpoint){const p=game.checkpoint.player;g.strokeStyle='#7aefbc';g.lineWidth=1;g.beginPath();g.moveTo(p.x+6,p.y+16);g.lineTo(p.x+6,p.y-4);g.stroke();g.fillStyle='#7aefbc';g.beginPath();g.moveTo(p.x+6,p.y-4);g.lineTo(p.x+16,p.y);g.lineTo(p.x+6,p.y+4);g.fill();}
