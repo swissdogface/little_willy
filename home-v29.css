@@ -41,3 +41,9 @@
  .panel:has(.score-result)>#shareText{grid-column:1 / -1;min-height:44px;height:48px}
 }
 .key-count.missing{opacity:.45}
+/* Menu buttons must allow native vertical swipes; gameplay buttons stay fixed. */
+.panel,.panel button,.panel button *{touch-action:pan-y}
+.panel{overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#8bb6cb #13273b}
+.panel::-webkit-scrollbar{width:7px}
+.panel::-webkit-scrollbar-thumb{background:#8bb6cb;border-radius:8px}
+.panel:has(.level-grid)>.panel-actions{position:sticky;bottom:0;background:#13273b;padding:8px 0 2px;z-index:1;box-shadow:0 -8px 12px #13273b}
