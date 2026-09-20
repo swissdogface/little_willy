@@ -130,14 +130,10 @@ function worldEnemy(g,level,id,x,y,alpha,flip=false){
   g.fillStyle='#fff6b2';g.beginPath();g.moveTo(-7.5,-8);g.quadraticCurveTo(-2,-12,3,-10.2);g.lineTo(1.7,-8.8);g.quadraticCurveTo(-3,-10.2,-6.5,-6.8);g.closePath();g.fill();
   g.restore();return true;
  }
- const palette={L03:['#f3a64f','#5a3226','#ffe1a0'],L08:['#f0c34f','#5d4119','#fff1a8'],L04:['#f06c50','#49223a','#ffd28b'],L11:['#ff784d','#451c2d','#ffd08e'],L05:['#ec86d1','#51275d','#ffd1f7'],L07:['#74db9a','#1d5a5b','#cfffb9'],L06:['#66d9ff','#283c85','#d9fbff'],L13:['#7ee7ce','#225564','#e2fff5'],L09:['#a69ce7','#30345d','#e4ddff'],L10:['#c6e7f0','#49667c','#f3ffff'],LMAIN:['#65dbf5','#20476e','#e6fbff']}[level.theme]||['#7ee7ff','#254d75','#edffff'];const [main,dark,light]=palette;g.save();g.globalAlpha=alpha;g.translate(x,y);g.strokeStyle=dark;g.lineWidth=.7;
- if(id<=33){g.fillStyle=main;g.beginPath();g.ellipse(8,9,6.6,5.5,0,0,7);g.fill();g.stroke();g.fillStyle=light;g.beginPath();g.arc(5.5,8,1.7,0,7);g.arc(10.5,8,1.7,0,7);g.fill();g.fillStyle=dark;g.fillRect(5,7.5,1,1.5);g.fillRect(10,7.5,1,1.5);g.strokeStyle=light;g.beginPath();g.moveTo(3,13);g.lineTo(13,13);g.stroke();}
- else if(id<=41){g.fillStyle=main;g.beginPath();g.ellipse(5,8,5,3.5,-.5,0,7);g.ellipse(11,8,5,3.5,.5,0,7);g.fill();g.stroke();g.fillStyle=light;g.beginPath();g.ellipse(8,8,2,4.6,0,0,7);g.fill();}
- else if(id<=45){g.fillStyle=main;g.beginPath();g.moveTo(8,1);g.lineTo(14,14);g.lineTo(8,12);g.lineTo(2,14);g.closePath();g.fill();g.stroke();g.fillStyle=light;g.fillRect(7.3,5,1.4,4);}
- else{g.shadowColor=main;g.shadowBlur=4;ellipse(g,6,8,4.5,5.5,main);g.shadowBlur=0;ellipse(g,6,8,2.1,2.8,light);g.fillStyle=dark;g.fillRect(5.3,7.1,1.4,2.2);}
- g.restore();return true;
+ // Unmapped artwork uses its original contours, including every animation frame.
+ return false;
 }
-function sprite(g,level,id,x,y,flip=false,alpha=1){if(hd&&(level.theme==='L02'||id>=80)&&iceSprite(g,id,x,y,alpha))return;if(hd&&worldEnemy(g,level,id,x,y,alpha,flip))return;const ref=level.spriteMap[id];if(!ref)return;const d=WILLY_ART.sprites[ref[0]]?.[ref[1]];if(!d)return;const im=renderShape(d,'s'+ref.join(':'));g.save();g.globalAlpha=alpha;if(flip){g.translate(x+d.w-8,y);g.scale(-1,1);g.drawImage(im,0,0,d.w,d.h);}else g.drawImage(im,x,y,d.w,d.h);g.restore();}
+function sprite(g,level,id,x,y,flip=false,alpha=1){if(hd&&id>=80&&iceSprite(g,id,x,y,alpha))return;if(hd&&worldEnemy(g,level,id,x,y,alpha,flip))return;const ref=level.spriteMap[id];if(!ref)return;const d=WILLY_ART.sprites[ref[0]]?.[ref[1]];if(!d)return;const im=renderShape(d,'s'+ref.join(':'));g.save();g.globalAlpha=alpha;if(flip){g.translate(x+d.w-8,y);g.scale(-1,1);g.drawImage(im,0,0,d.w,d.h);}else g.drawImage(im,x,y,d.w,d.h);g.restore();}
 let map=null,mapId='',finale=new Image();finale.src='finale-original.png';
 const materials=new Image();materials.src='materials-hd.png';materials.onload=()=>{mapId='';};
 const iceBackdrop=new Image();iceBackdrop.src='ice-caves-backdrop.png';iceBackdrop.onload=()=>{mapId='';};

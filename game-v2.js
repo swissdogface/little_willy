@@ -98,19 +98,23 @@ document.addEventListener('click',()=>audioStart(),{once:true,capture:true});
 document.addEventListener('keydown',()=>audioStart(),{once:true,capture:true});
  $('start').onclick=()=>start(0);$('recommended').onclick=()=>start(2);$('checkpointQuick').onclick=savePoint;$('continue').onclick=()=>start(progress.last);$('levelSelect').onclick=levels;$('settings').onclick=()=>{audioStart();options(false);};$('pause').onclick=()=>options(true);$('godQuick').onclick=toggleGod;$('musicQuick').onclick=toggleMusic;
 const pointers=new Map();
+const steeringOrigins=new Map();
 // Slide a held steering finger between arrows without lifting it during a jump.
 function steerPointer(e){
  const previous=pointers.get(e.pointerId);if(previous!=='left'&&previous!=='right')return;
- const left=document.querySelector('[data-key="left"]'),right=document.querySelector('[data-key="right"]');
- const a=left.getBoundingClientRect(),b=right.getBoundingClientRect();
- const next=e.clientX<(a.right+b.left)/2?'left':'right';
+ const origin=steeringOrigins.get(e.pointerId);
+ // A short thumb swipe reverses direction even without crossing both buttons.
+ const delta=origin===undefined?0:e.clientX-origin;
+ const next=Math.abs(delta)>=12?(delta<0?'left':'right'):previous;
+ if(origin===undefined)steeringOrigins.set(e.pointerId,e.clientX);
+ if(Math.abs(delta)>=12||delta*(previous==='left'?-1:1)>0)steeringOrigins.set(e.pointerId,e.clientX);
  if(next===previous)return;pointers.delete(e.pointerId);pointers.set(e.pointerId,next);
  for(const k of ['left','right']){keys[k]=Array.from(pointers.values()).includes(k);document.querySelector('[data-key="'+k+'"]').classList.toggle('pressed',keys[k]);}
 }
 document.querySelectorAll('[data-key]').forEach(b=>{
- b.addEventListener('pointerdown',e=>{e.preventDefault();audioStart();b.setPointerCapture(e.pointerId);const k=b.dataset.key;pointers.set(e.pointerId,k);if(k==='jump'&&!keys.jump)jumpPress=true;if(k==='up'&&!keys.up)upPress=true;if(k==='shoot')shootPress=true;keys[k]=true;b.classList.add('pressed');});
+ b.addEventListener('pointerdown',e=>{e.preventDefault();audioStart();b.setPointerCapture(e.pointerId);const k=b.dataset.key;pointers.set(e.pointerId,k);if(k==='left'||k==='right')steeringOrigins.set(e.pointerId,e.clientX);if(k==='jump'&&!keys.jump)jumpPress=true;if(k==='up'&&!keys.up)upPress=true;if(k==='shoot')shootPress=true;keys[k]=true;b.classList.add('pressed');});
  b.addEventListener('pointermove',steerPointer);
- const end=e=>{const k=pointers.get(e.pointerId);pointers.delete(e.pointerId);if(k&&!Array.from(pointers.values()).includes(k)){keys[k]=false;document.querySelector('[data-key="'+k+'"]').classList.remove('pressed');}};b.addEventListener('pointerup',end);b.addEventListener('pointercancel',end);b.addEventListener('lostpointercapture',end);
+ const end=e=>{const k=pointers.get(e.pointerId);pointers.delete(e.pointerId);steeringOrigins.delete(e.pointerId);if(k&&!Array.from(pointers.values()).includes(k)){keys[k]=false;document.querySelector('[data-key="'+k+'"]').classList.remove('pressed');}};b.addEventListener('pointerup',end);b.addEventListener('pointercancel',end);b.addEventListener('lostpointercapture',end);
 });
 const keyMap={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowDown:'down',ArrowUp:'up',KeyW:'up',Space:'jump',KeyS:'shoot',KeyJ:'shoot',Comma:'left',Period:'right'};
 window.addEventListener('keydown',e=>{
@@ -125,7 +129,7 @@ function resize(){W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,3)
 function frame(now){
  const elapsed=Math.min(.075,(now-last)/1000||0);last=now;clock+=elapsed;if(toastTimer>0){toastTimer-=elapsed;if(toastTimer<=0)$('toast').style.opacity=0;}
  if(mode==='play'){
-  acc+=elapsed;while(acc>=1/120){game.step(1/120,{...keys,jump:jumpPress,up:upPress,shoot:keys.shoot||shootPress});jumpPress=false;upPress=false;shootPress=false;acc-=1/120;
+  acc+=elapsed;while(acc>=1/120){game.step(1/120,{...keys,jump:jumpPress,jumpHeld:keys.jump,up:upPress,shoot:keys.shoot||shootPress});jumpPress=false;upPress=false;shootPress=false;acc-=1/120;
    const events=game.events.splice(0);for(const e of events){sound(e.type);if(e.type==='enter'){start(e.index);break;}if(e.type==='complete'){finish();break;}if(e.type==='exitInfo')toast(exitMessage(e));if(e.type==='card')toast('Exit card found · '+exitMessage(game.exitStatus()));if(e.type==='unlock')toast('Lock opened');if(e.type==='lockedFinale')toast('The final level unlocks after the other 23 levels.');if(e.type==='respawn')toast(e.checkpoint?'Back at your checkpoint · Items and keys restored':'New attempt · The level starts over.');}
    if(mode!=='play'){acc=0;break;}
   }sync();

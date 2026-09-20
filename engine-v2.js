@@ -77,6 +77,17 @@ class Game {
  }
  moveY(dy,oldFeet){
   const p=this.player,oldY=p.y,wasGrounded=p.grounded;p.y+=dy;p.grounded=false;p.ride=null;
+  // Let a directed jump skim a nearby ceiling edge instead of losing all lift.
+  // Both sweeps must be clear: this cannot pass through a wall or locked door.
+  if(dy<0&&p.vx){
+   const hits=this.tilesNear(this.playerBody()).filter(t=>t.kind===1&&overlap(this.playerBody(),t));
+   const candidates=hits.flatMap(t=>[t.x-p.w,t.x+t.w]).filter(x=>x>=0&&x+p.w<=640&&Math.abs(x-p.x)<=8&&(x-p.x)*p.vx>0).sort((a,b)=>Math.abs(a-p.x)-Math.abs(b-p.x));
+   for(const x of candidates){
+    const side={...this.playerBody(Math.min(x,p.x),oldY),w:p.w+Math.abs(x-p.x)},rise={...this.playerBody(x,p.y),h:p.h-HEAD_INSET-dy};
+    if([side,rise].some(body=>this.tilesNear(body).some(t=>(t.kind===1||t.kind===3)&&overlap(body,t))))continue;
+    p.x=x;break;
+   }
+  }
   const surfaces=this.tilesNear(this.playerBody()).concat(this.enemies.filter(e=>e.alive&&e.contact===1).map(e=>({...e,kind:2,platform:e})));
   let floor=null;
   for(const t of surfaces){
@@ -121,7 +132,9 @@ class Game {
   if(this.jumpBuffer>0&&p.coyote>0){p.vy=-300;p.grounded=false;p.ride=null;p.coyote=0;this.jumpBuffer=0;this.emit('jump');}
   const dir=(input.right?1:0)-(input.left?1:0);p.vx=dir*104;if(dir)p.face=dir;
   this.unlock();this.moveX(p.vx*dt);
-  const oldFeet=p.y+p.h;p.vy=Math.min(330,p.vy+600*dt);if(this.moveY(p.vy*dt,oldFeet))return;
+  // Holding jump gives more time to steer around overhangs; release for a short jump.
+  const gravity=input.jumpHeld&&p.vy<0?450:600;
+  const oldFeet=p.y+p.h;p.vy=Math.min(330,p.vy+gravity*dt);if(this.moveY(p.vy*dt,oldFeet))return;
   if(input.shoot&&this.cooldown<=0){this.cooldown=.23;this.shots.push({x:p.x+(p.face>0?p.w:-6),y:p.y+7,w:6,h:3,vx:p.face*300,life:1.8});this.emit('shoot');}
   for(const s of this.shots){
    s.life-=dt;const dx=s.vx*dt;const steps=Math.max(1,Math.ceil(Math.abs(dx)/3));
