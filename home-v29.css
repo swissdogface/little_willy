@@ -17,3 +17,26 @@
 .publisher-logos{position:absolute;right:24px;bottom:18px;display:flex;align-items:center;gap:12px;padding:9px 12px;border:1px solid #b9dbe530;border-radius:12px;background:#051326df;box-shadow:0 4px 20px #0004}.publisher-logos>span{font-size:8px;letter-spacing:1.3px;color:#a6c2d5}.publisher-logos svg{display:block;width:94px;height:46px;border-radius:4px;overflow:hidden;image-rendering:pixelated}.publisher-logos svg:last-child{width:77px}
 @media(max-height:440px){.publisher-logos{right:12px;bottom:10px;gap:8px;padding:6px 8px}.publisher-logos>span{display:none}.publisher-logos svg{width:70px;height:35px}.publisher-logos svg:last-child{width:59px}}
 @media(max-width:600px){.publisher-logos{position:relative;right:auto;bottom:auto;width:max-content;margin:0 5vw 12px}}
+/* Transient feedback shares the reserved instruction strip, never the playfield. */
+#toast{top:72px;bottom:auto;left:0;right:0;transform:none;max-width:none;height:36px;border:0;border-bottom:1px solid #344d62;border-radius:0;background:#101e2e;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:650;line-height:1.2;padding:3px 16px;pointer-events:none}
+@media(max-height:440px){#toast{top:66px;height:34px;font-size:16px;padding:2px 12px}}
+/* Phone landscape: score beside the result, with all actions visible together. */
+@media(orientation:landscape) and (max-height:650px){
+ .panel:has(.score-result){width:min(850px,96vw);max-height:96dvh;padding:12px 18px;display:grid;grid-template-columns:minmax(160px,1fr) minmax(0,2fr);column-gap:18px;row-gap:5px}
+ .panel .score-result{grid-column:1;grid-row:1 / 5;margin:0;padding:12px 8px;display:flex;flex-direction:column;justify-content:center}
+ .panel .score-result strong{font-size:40px;line-height:1.2}
+ .panel:has(.score-result)>.victory-mark{display:none}
+ .panel:has(.score-result)>.eyebrow,.panel:has(.score-result)>h2,.panel:has(.score-result)>p,.panel:has(.score-result)>.victory-stats{grid-column:2;margin:0}
+ .panel:has(.score-result)>h2{font-size:22px;line-height:1.15}
+ .panel:has(.score-result)>.eyebrow{font-size:9px}
+ .panel .victory-stats{gap:6px}
+ .panel .victory-stats div{padding:6px 4px}
+ .panel .victory-stats strong{font-size:22px}
+ .panel:has(.score-result)>.world-progress{grid-column:1 / -1;height:7px;margin:2px 0}
+ .panel:has(.score-result)>.world-progress+p{grid-column:1 / -1;font-size:11px}
+ .panel:has(.score-result)>.panel-actions{grid-column:1 / -1;display:flex;flex-wrap:nowrap;margin:3px 0 0;gap:8px}
+ .panel:has(.score-result)>.panel-actions button{flex:1;min-width:0;min-height:44px;padding:8px;font-size:12px}
+ .panel:has(.score-result)>#shareStatus{grid-column:1 / -1;font-size:11px}
+ .panel:has(.score-result)>#shareStatus:empty{display:none}
+ .panel:has(.score-result)>#shareText{grid-column:1 / -1;min-height:44px;height:48px}
+}

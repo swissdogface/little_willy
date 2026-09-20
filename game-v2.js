@@ -126,7 +126,7 @@ function frame(now){
  const elapsed=Math.min(.075,(now-last)/1000||0);last=now;clock+=elapsed;if(toastTimer>0){toastTimer-=elapsed;if(toastTimer<=0)$('toast').style.opacity=0;}
  if(mode==='play'){
   acc+=elapsed;while(acc>=1/120){game.step(1/120,{...keys,jump:jumpPress,up:upPress,shoot:keys.shoot||shootPress});jumpPress=false;upPress=false;shootPress=false;acc-=1/120;
-   const events=game.events.splice(0);for(const e of events){sound(e.type);if(e.type==='enter'){start(e.index);break;}if(e.type==='complete'){finish();break;}if(e.type==='exitInfo')toast(exitMessage(e));if(e.type==='card')toast('Exit card found · '+exitMessage(game.exitStatus()));if(e.type==='unlock')toast('Lock opened');if(e.type==='lockedFinale')toast('The final level unlocks after the other 23 levels.');if(e.type==='respawn')toast(e.checkpoint?'Back at your checkpoint · Items and keys restored':'New attempt · The level starts over.');if(e.type==='collect'&&game.index)toast('Score '+(game.collected*100)+' · Find the card and finish to save your best');}
+   const events=game.events.splice(0);for(const e of events){sound(e.type);if(e.type==='enter'){start(e.index);break;}if(e.type==='complete'){finish();break;}if(e.type==='exitInfo')toast(exitMessage(e));if(e.type==='card')toast('Exit card found · '+exitMessage(game.exitStatus()));if(e.type==='unlock')toast('Lock opened');if(e.type==='lockedFinale')toast('The final level unlocks after the other 23 levels.');if(e.type==='respawn')toast(e.checkpoint?'Back at your checkpoint · Items and keys restored':'New attempt · The level starts over.');}
    if(mode!=='play'){acc=0;break;}
   }sync();
  }
