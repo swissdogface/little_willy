@@ -4,17 +4,21 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 // Keep the 16-pixel drawing and foot position; hair is outside the solid hitbox.
 const HEAD_INSET=2,CORNER_ASSIST=4;
+// Empty, reachable positions checked against the original maps (heart-routes.json).
+const HEART_POSITIONS={"1":[17,305],"2":[448,16],"3":[26,289],"4":[83,304],"5":[14,313],"6":[224,48],"7":[5,63],"8":[272,32],"9":[128,144],"10":[240,35],"11":[23,290],"12":[215,178],"13":[67,297],"14":[614,288],"15":[240,16],"16":[452,117],"17":[352,352],"18":[350,336],"19":[515,48],"20":[153,48],"21":[257,208],"22":[112,112],"23":[616,94],"24":[591,82]};
 class Game {
  constructor(levels,options={}){this.levels=levels;this.god=!!options.god;this.gentle=!!options.gentle;this.done=options.done||[];this.events=[];this.load(0);}
  emit(type,data={}){this.events.push({type,...data});}
  load(index){
   this.checkpoint=null;this.usedCheckpoint=false;this.retries=0;this.nearDoor=null;this.index=clamp(index,0,this.levels.length-1);this.level=this.levels[this.index];this.time=0;this.complete=false;this.events=[];this.shots=[];this.sparks=[];this.keys=[0,0,0];this.card=false;this.collected=0;this.cooldown=0;this.jumpBuffer=0;this.drop=0;this.doorCooldown=0;this.wasNearExit=false;
   this.items=this.level.items.map((i,id)=>({...i,id,w:16,h:16,taken:false}));
+  const heart=HEART_POSITIONS[this.index];
+  if(heart&&this.level.theme)this.items.push({id:this.items.length,x:heart[0],y:heart[1],w:16,h:16,kind:4,taken:false});
   this.enemies=this.level.enemies.map((e,id)=>({...e,id,alive:true,flash:0,dx:0,dy:0,dirX:[1,-1,0,0,1,-1,1,-1][e.direction]||0,dirY:[0,0,-1,1,-1,-1,1,1][e.direction]||0}));
   this.player={x:this.level.spawn.x+2,y:this.level.spawn.y,w:12,h:16,vx:0,vy:0,face:this.level.facing===12?1:-1,hp:this.gentle?6:4,invincible:1.4,grounded:false,coyote:0,ride:null};
  }
  setGod(on){this.god=!!on;this.emit('god');}
- setGentle(on){this.gentle=!!on;this.player.hp=Math.min(this.player.hp,this.gentle?6:4);}
+ setGentle(on){this.gentle=!!on;this.player.hp=Math.min(this.player.hp,(this.gentle?6:4)+(this.items.some(i=>i.kind===4&&i.taken)?1:0));}
  snapshot(){return {index:this.index};}
  setCheckpoints(on){this.checkpoints=!!on;if(!on)this.checkpoint=null;}
  saveCheckpoint(){
@@ -40,7 +44,7 @@ class Game {
  restart(){
   const saved=this.checkpoints&&this.checkpoint,elapsed=this.time,retries=(this.retries||0)+1,used=this.usedCheckpoint;
   this.load(this.index);this.time=elapsed;this.retries=retries;this.usedCheckpoint=used;
-  if(saved){const state=JSON.parse(JSON.stringify(saved));Object.assign(this,state);this.checkpoint=saved;Object.assign(this.player,{hp:this.gentle?6:4,invincible:2,vx:0,vy:0,ride:null});}
+  if(saved){const state=JSON.parse(JSON.stringify(saved));Object.assign(this,state);this.checkpoint=saved;Object.assign(this.player,{hp:(this.gentle?6:4)+(this.items.some(i=>i.kind===4&&i.taken)?1:0),invincible:2,vx:0,vy:0,ride:null});}
   this.emit('respawn',{checkpoint:!!saved});
  }
  hurt(fatal=false){
@@ -93,8 +97,8 @@ class Game {
   for(const t of surfaces){
    if(!overlap(this.playerBody(),t))continue;
    if(dy>=0&&oldFeet<=t.y+Math.max(1,t.platform?Math.abs(t.platform.dy)+1:1)&&!(t.kind===2&&this.drop>0)){
-    // In the lunar challenge, a real foothold wins over a neighbouring spike.
-    const safeSupport=this.index===21&&t.kind!==3&&floor?.kind===3&&t.y===floor.y&&Math.min(p.x+p.w,t.x+t.w)-Math.max(p.x,t.x)>=2;
+    // A real foothold wins over a neighbouring spike.
+    const safeSupport=t.kind!==3&&floor?.kind===3&&t.y===floor.y&&Math.min(p.x+p.w,t.x+t.w)-Math.max(p.x,t.x)>=2;
     if(!floor||t.y<floor.y||safeSupport)floor=t;
    }else if(dy<0&&t.kind===1){p.y=Math.max(p.y,t.y+t.h-HEAD_INSET);p.vy=0;}
   }
@@ -112,13 +116,12 @@ class Game {
   if(floor){
    p.y=floor.y-p.h;p.vy=0;p.grounded=true;p.ride=floor.platform?floor.platform.id:null;
    if(floor.kind===3&&!this.god&&p.invincible<=0){
-    if(this.index!==21)return this.hurt(true);
     // Brief contact costs one heart, with time to jump back onto safe ground.
     if(this.hurt(false))return true;p.invincible=2.2;
    }
   }
   if(p.y<0){p.y=0;p.vy=Math.max(0,p.vy);}
-  if(p.y>400){if(this.god){p.x=this.level.spawn.x+2;p.y=this.level.spawn.y;p.vy=0;}else{this.restart();return true;}}
+  if(p.y>400){if(!this.god&&this.hurt(false))return true;p.x=this.level.spawn.x+2;p.y=this.level.spawn.y;p.vx=0;p.vy=0;p.invincible=2.2;}
  }
  step(dt,input={}){
   if(this.complete)return;dt=clamp(dt,0,1/30);this.time+=dt;const p=this.player;
@@ -161,6 +164,7 @@ class Game {
   for(const e of this.enemies)if(e.alive&&e.contact===0&&overlap({...p,x:p.x+1,y:p.y+2,w:p.w-2,h:p.h-3},{...e,x:e.x+2,y:e.y+2,w:Math.max(1,e.w-4),h:Math.max(1,e.h-4)}))if(this.hurt())return;
   for(const i of this.items){
    if(i.taken||i.kind===2||!overlap(p,{...i,x:i.x+2,y:i.y+2,w:12,h:12}))continue;
+   if(i.kind===4){p.hp=Math.min((this.gentle?6:4)+1,p.hp+1);i.taken=true;this.emit('heart',{x:i.x,y:i.y});continue;}
    if(i.kind===0){
     this.collected++;
    }else if(i.kind===1)this.keys[i.sprite-81]++;
