@@ -170,7 +170,8 @@ function hazardStyle(level,i){
  const index=level.tiles[i]&63;
  if(level.theme==='L02'||level.theme==='L01')return 'spikes';
  if(level.theme==='L11')return 'lava';
- if(level.theme==='L10'||(level.theme==='L03'&&index>=55&&index<=58))return 'electric';
+ if(level.theme==='L10')return 'electric-spikes';
+ if(level.theme==='L03'&&index>=55&&index<=58)return 'electric';
  return 'acid';
 }
 function hazardTile(g,level,i){
@@ -178,7 +179,18 @@ function hazardTile(g,level,i){
  const x=i%40*16,y=Math.floor(i/40)*16;
  g.save();g.translate(x,y);
  // Lethal tile collision is on the top face: keep the visible danger at y=0.
- if(style==='spikes'){
+ if(style==='electric-spikes'){
+  // The lunar worlds use the original jagged, double-edged energy barrier.
+  // Teeth reach both tile edges; gaps reveal the background instead of a slab.
+  const grad=g.createLinearGradient(0,0,0,16);grad.addColorStop(0,'#ffffff');grad.addColorStop(.4,'#fffbc1');grad.addColorStop(.5,'#ffe438');grad.addColorStop(.6,'#fffbc1');grad.addColorStop(1,'#ffffff');
+  g.fillStyle=grad;g.strokeStyle='#302e37';g.lineWidth=.65;g.lineJoin='miter';
+  g.beginPath();g.moveTo(0,6);
+  for(const tip of [3,8,13]){g.lineTo(tip-1.8,6);g.lineTo(tip,0);g.lineTo(tip+1.8,6);}
+  g.lineTo(16,6);g.lineTo(16,10);
+  for(const tip of [13,8,3]){g.lineTo(tip+1.8,10);g.lineTo(tip,16);g.lineTo(tip-1.8,10);}
+  g.lineTo(0,10);g.closePath();g.fill();g.stroke();
+  g.strokeStyle='#ffffee';g.lineWidth=.75;g.beginPath();g.moveTo(0,8);g.lineTo(16,8);g.stroke();
+ }else if(style==='spikes'){
   const ice=level.theme==='L02',base=ice?'#245888':'#853523',light=ice?'#ddffff':'#ffd699';
   const grad=g.createLinearGradient(0,0,16,16);grad.addColorStop(0,light);grad.addColorStop(.45,ice?'#82e5ef':'#ed9465');grad.addColorStop(1,base);
   g.fillStyle=grad;g.strokeStyle=base;g.lineWidth=.5;
