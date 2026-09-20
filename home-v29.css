@@ -40,3 +40,4 @@
  .panel:has(.score-result)>#shareStatus:empty{display:none}
  .panel:has(.score-result)>#shareText{grid-column:1 / -1;min-height:44px;height:48px}
 }
+.key-count.missing{opacity:.45}
