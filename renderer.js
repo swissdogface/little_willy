@@ -164,10 +164,46 @@ function materialLayers(g,level){
   g.save();g.clip(mask,'evenodd');g.fillStyle=materialPattern(g,mat);g.fillRect(0,0,640,384);g.restore();
  }
 }
+// Classify original lethal tiles by their source artwork, not collision type alone.
+function hazardStyle(level,i){
+ if((level.tiles[i]>>6)!==3)return null;
+ const index=level.tiles[i]&63;
+ if(level.theme==='L02'||level.theme==='L01')return 'spikes';
+ if(level.theme==='L11')return 'lava';
+ if(level.theme==='L10'||(level.theme==='L03'&&index>=55&&index<=58))return 'electric';
+ return 'acid';
+}
+function hazardTile(g,level,i){
+ const style=hazardStyle(level,i);if(!style)return;
+ const x=i%40*16,y=Math.floor(i/40)*16;
+ g.save();g.translate(x,y);
+ // Lethal tile collision is on the top face: keep the visible danger at y=0.
+ if(style==='spikes'){
+  const ice=level.theme==='L02',base=ice?'#245888':'#853523',light=ice?'#ddffff':'#ffd699';
+  const grad=g.createLinearGradient(0,0,16,16);grad.addColorStop(0,light);grad.addColorStop(.45,ice?'#82e5ef':'#ed9465');grad.addColorStop(1,base);
+  g.fillStyle=grad;g.strokeStyle=base;g.lineWidth=.5;
+  g.beginPath();g.moveTo(.5,15.5);g.lineTo(4,0);g.lineTo(8,14);g.lineTo(12,0);g.lineTo(15.5,15.5);g.closePath();g.fill();g.stroke();
+  g.strokeStyle=light;g.lineWidth=.7;g.beginPath();g.moveTo(1.8,13);g.lineTo(4,1.5);g.moveTo(9.4,13);g.lineTo(12,1.5);g.stroke();
+  rounded(g,.3,14.5,15.4,1.4,.4,base);
+ }else{
+  const [bright,main,dark]=style==='lava'?['#fff2a0','#ff651e','#8a182b']:style==='electric'?['#ffffdb','#e9de46','#705325']:['#e5ffb1','#80e631','#185940'];
+  const grad=g.createLinearGradient(0,0,0,16);grad.addColorStop(0,bright);grad.addColorStop(.17,main);grad.addColorStop(1,dark);g.fillStyle=grad;g.fillRect(0,0,16,16);
+  const exposed=i<40||(level.tiles[i-40]>>6)!==3;
+  if(exposed){g.strokeStyle=bright;g.lineWidth=1;g.beginPath();g.moveTo(0,.6);g.bezierCurveTo(4,2,5,0,8,.6);g.bezierCurveTo(12,2,13,0,16,.6);g.stroke();}
+  g.strokeStyle=bright;g.lineWidth=.7;
+  if(style==='electric'){
+   g.beginPath();g.moveTo(0,9);g.lineTo(4,9);g.lineTo(7,4);g.lineTo(9,12);g.lineTo(12,7);g.lineTo(16,7);g.stroke();
+  }else{
+   for(const [bx,by,r] of [[4,6,1.3],[11,11,1.8]]){g.beginPath();g.arc(bx,by,r,0,Math.PI*2);g.stroke();}
+   if(style==='lava'){g.beginPath();g.moveTo(0,14);g.lineTo(5,10);g.lineTo(8,13);g.lineTo(16,9);g.stroke();}
+  }
+ }
+ g.restore();
+}
 function iceTile(g,level,i){
  const value=level.tiles[i],type=value>>6,x=i%40*16,y=Math.floor(i/40)*16;
  if(type===0)return;
- if(type===3){g.fillStyle='rgba(34,91,153,.88)';g.beginPath();g.moveTo(x+1,y);g.lineTo(x+15,y);g.lineTo(x+8,y+16);g.closePath();g.fill();g.fillStyle='#d7ffff';g.beginPath();g.moveTo(x+3,y+1);g.lineTo(x+12,y+1);g.lineTo(x+8,y+11);g.closePath();g.fill();return;}
+ if(type===3)return; // Dedicated hazard pass below.
  const above=i<40||((level.tiles[i-40]>>6)===0),left=i%40===0||((level.tiles[i-1]>>6)===0),right=i%40===39||((level.tiles[i+1]>>6)===0),bottom=i>=920||((level.tiles[i+40]>>6)===0);
  const grad=g.createLinearGradient(x,y,x+16,y+16);grad.addColorStop(0,'#c5faff');grad.addColorStop(.18,'#5bcce3');grad.addColorStop(1,'#19558e');rounded(g,x+.2,y+.2,15.6,15.6,1.6,grad,'#163f70');
  g.globalAlpha=.42;g.fillStyle='#efffff';g.beginPath();g.moveTo(x+2,y+3);g.lineTo(x+11,y+2);g.lineTo(x+7,y+7);g.closePath();g.fill();g.fillStyle='#1c5e98';g.beginPath();g.moveTo(x+15,y+7);g.lineTo(x+9,y+15);g.lineTo(x+15,y+15);g.closePath();g.fill();g.globalAlpha=1;
@@ -178,7 +214,7 @@ function modernWorldTiles(g,level){
  const palettes={L01:['#80485b','#2d1c37','#ffc28e'],LMAIN:['#1d4e75','#0a243e','#8ee9f5'],L03:['#d79a42','#704022','#ffe0a0'],L08:['#c49735','#5e4315','#fff0a8'],L04:['#7b3738','#211b2d','#ffb05c'],L11:['#793332','#1d1726','#ff9d54'],L05:['#7a4a8e','#281c45','#f2b4ff'],L07:['#356e70','#163d4d','#a7f0c7'],L06:['#274f79','#152446','#70efff'],L13:['#3a6171','#192b3a','#9cf0df'],L09:['#4e5469','#1d2435','#b7c5df'],L10:['#657c91','#26384d','#e6f4ff']}[level.theme];if(!palettes)return;
  for(let i=0;i<960;i++){
   const type=level.tiles[i]>>6;if(type!==1&&type!==2&&type!==3)continue;const x=i%40*16,y=Math.floor(i/40)*16;
-  if(type===3){g.fillStyle=palettes[0];g.beginPath();g.moveTo(x+1,y);g.lineTo(x+15,y);g.lineTo(x+8,y+16);g.closePath();g.fill();g.strokeStyle=palettes[2];g.lineWidth=.6;g.stroke();continue;}
+  if(type===3)continue; // Preserve the kind of danger, not a generic triangle.
   const grad=g.createLinearGradient(x,y,x+16,y+16);grad.addColorStop(0,palettes[2]);grad.addColorStop(.15,palettes[0]);grad.addColorStop(1,palettes[1]);rounded(g,x+.2,y+.2,15.6,15.6,1.5,grad,palettes[1]);
   g.globalAlpha=.22;g.fillStyle='#fff';g.fillRect(x+1.2,y+1.2,13.6,1.2);g.globalAlpha=1;g.strokeStyle='rgba(6,14,31,.45)';g.lineWidth=.55;g.beginPath();g.moveTo(x+2,y+13);g.lineTo(x+14,y+4);g.stroke();
   if(type===2){g.globalAlpha=.46;g.fillStyle=palettes[2];g.fillRect(x+3,y+6.5,10,1.5);g.globalAlpha=1;}
@@ -209,11 +245,12 @@ function prepare(level){
   const scenic=hd&&scenicBackdrop(level);
   if(hd&&level.theme==='L02'&&iceBackdrop.complete&&iceBackdrop.naturalWidth){g.globalAlpha=.42;g.drawImage(iceBackdrop,0,0,640,384);g.globalAlpha=1;g.fillStyle='rgba(4,25,63,.18)';g.fillRect(0,0,640,384);}
   else if(scenic?.complete&&scenic.naturalWidth){g.globalAlpha=.48;g.drawImage(scenic,0,0,640,384);g.globalAlpha=1;g.fillStyle='rgba(4,12,29,.22)';g.fillRect(0,0,640,384);}
-  for(let i=0;i<960;i++){if(hd&&level.theme==='L02'){iceTile(g,level,i);continue;}if(scenic&&(level.tiles[i]>>6)===0)continue;const index=level.tiles[i]&63,desc=WILLY_ART.tiles[level.theme]?.[index];if(!desc)continue;g.drawImage(renderShape(desc,'t'+level.theme+':'+index),i%40*16,Math.floor(i/40)*16,16,16);}
+  for(let i=0;i<960;i++){if(hd&&(level.tiles[i]>>6)===3)continue;if(hd&&level.theme==='L02'){iceTile(g,level,i);continue;}if(scenic&&(level.tiles[i]>>6)===0)continue;const index=level.tiles[i]&63,desc=WILLY_ART.tiles[level.theme]?.[index];if(!desc)continue;g.drawImage(renderShape(desc,'t'+level.theme+':'+index),i%40*16,Math.floor(i/40)*16,16,16);}
   if(scenic)modernWorldTiles(g,level);
   if(hd&&level.theme==='LMAIN')stationSigns(g);
  }
  if(hd&&level.id!==1&&level.theme!=='L02'&&!scenicBackdrop(level)){materialLayers(g,level);if(level.theme==='L11')lavaMaterials(g,level);g.fillStyle='rgba(5,15,32,.17)';g.fillRect(0,0,640,384);wallMaterials(g,level);}
+ if(hd)for(let i=0;i<960;i++)if((level.tiles[i]>>6)===3)hazardTile(g,level,i);
  // Add fine lighting to exposed original surfaces, without changing their outlines.
  if(hd){
   g.lineWidth=.35;
@@ -308,5 +345,5 @@ function draw(g,game,view,time){
  for(const s of game.shots){rounded(g,s.x,s.y,s.w,s.h,1.3,'#fff1b9');g.fillStyle='#ff9d50';g.fillRect(s.x+(s.vx>0?-4:6),s.y+.7,4,1.5);}
  g.restore();
 }
-return {draw,setHD(on){hd=!!on;mapId='';},prepare,sprite};
+return {draw,hazardStyle,hazardTile,setHD(on){hd=!!on;mapId='';},prepare,sprite};
 })();
