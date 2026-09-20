@@ -93,7 +93,9 @@ class Game {
   for(const t of surfaces){
    if(!overlap(this.playerBody(),t))continue;
    if(dy>=0&&oldFeet<=t.y+Math.max(1,t.platform?Math.abs(t.platform.dy)+1:1)&&!(t.kind===2&&this.drop>0)){
-    if(!floor||t.y<floor.y)floor=t;
+    // In the lunar challenge, a real foothold wins over a neighbouring spike.
+    const safeSupport=this.index===21&&t.kind!==3&&floor?.kind===3&&t.y===floor.y&&Math.min(p.x+p.w,t.x+t.w)-Math.max(p.x,t.x)>=2;
+    if(!floor||t.y<floor.y||safeSupport)floor=t;
    }else if(dy<0&&t.kind===1){p.y=Math.max(p.y,t.y+t.h-HEAD_INSET);p.vy=0;}
   }
   // A falling body may miss a shaft by a few pixels. Slide past the lip only
@@ -107,7 +109,14 @@ class Game {
     p.x=x;floor=null;break;
    }
   }
-  if(floor){p.y=floor.y-p.h;p.vy=0;p.grounded=true;p.ride=floor.platform?floor.platform.id:null;if(floor.kind===3&&!this.god&&p.invincible<=0)return this.hurt(true);}
+  if(floor){
+   p.y=floor.y-p.h;p.vy=0;p.grounded=true;p.ride=floor.platform?floor.platform.id:null;
+   if(floor.kind===3&&!this.god&&p.invincible<=0){
+    if(this.index!==21)return this.hurt(true);
+    // Brief contact costs one heart, with time to jump back onto safe ground.
+    if(this.hurt(false))return true;p.invincible=2.2;
+   }
+  }
   if(p.y<0){p.y=0;p.vy=Math.max(0,p.vy);}
   if(p.y>400){if(this.god){p.x=this.level.spawn.x+2;p.y=this.level.spawn.y;p.vy=0;}else{this.restart();return true;}}
  }
