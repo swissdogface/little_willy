@@ -1,53 +1,48 @@
-LITTLE WILLY – NETLIFY WEB EDITION 2.9
+LITTLE WILLY — NETLIFY WEB EDITION 2.12.2
 
-VERSION 2.9: New illustrated adventure home screen. Cans and lollipops are optional in ALL worlds, including World 20. Each awards 100 points. Only the exit card is required to finish. The personal high score sums your best completed run per world, stored on this device. Assisted runs (God Mode, gentler difficulty or checkpoints enabled during the run) have a separate record. Death and checkpoint restoration also restore the current pickup count. Existing world completion progress is preserved. Android remains version 2.8.
+LIVE SITE
+https://little-willy.netlify.app/
 
-SCHNELLSTART MIT NETLIFY DROP
-1. Bei https://app.netlify.com/ anmelden.
-2. https://app.netlify.com/drop öffnen.
-3. Little-Willy-Netlify-v2.8.zip direkt in das Feld ziehen. Alternativ das ZIP entpacken und den entpackten Ordner hineinziehen.
-4. Nach dem Hochladen zeigt Netlify die öffentliche Adresse mit der Endung netlify.app an.
+This repository is a complete static site. There is no build command, framework, PHP or database. Netlify publishes the repository root according to netlify.toml.
 
-Das Paket ist bereits fertig gebaut. Es gibt keinen Build-Befehl, keine Abhängigkeiten, kein PHP und keine Datenbank. index.html liegt direkt im veröffentlichten Ordner.
+CONNECT WITH GITHUB
+1. In Netlify, choose Add new site / Import an existing project.
+2. Select GitHub and the swissdogface/little_willy repository.
+3. Leave the build command empty.
+4. The publish directory is already set to "." by netlify.toml.
+5. Deploy the site.
 
-SPÄTER AKTUALISIEREN
-Im Netlify-Projekt unter „Deploys“ das jeweils neue vollständige ZIP oder den vollständigen entpackten Ordner in den Upload-Bereich ziehen. Danach das Spiel auf dem Handy einmal neu laden. Falls noch die vorige Version sichtbar ist, den Browser-Tab schließen und erneut öffnen.
+MANUAL NETLIFY DROP
+1. Sign in at https://app.netlify.com/.
+2. Open https://app.netlify.com/drop.
+3. Upload the complete Little-Willy-Netlify-v2.12.2.zip package, or its extracted folder.
+4. Keep index.html, _headers and all asset folders together.
 
-OPTIONAL: ÜBER GIT VERÖFFENTLICHEN
-Das vollständige Projekt enthält im Stamm eine netlify.toml mit dem Veröffentlichungsordner „web“. Wird nur der Inhalt dieses ZIPs in ein eigenes Repository gelegt, verwendet die netlify.toml darin den Veröffentlichungsordner „.“. Ein Build-Befehl ist in beiden Fällen nicht erforderlich.
+UPDATING
+Upload or deploy the complete new version so code, graphics, music and cache metadata remain synchronized. After an update, reload the game once. If an installed web app still shows an older version, close it completely and open it again so the new service worker can activate.
 
-WICHTIG
-- Netlify stellt die Seite über HTTPS bereit. Installation als Web-App und Offline-Speicher funktionieren dadurch.
-- Ändere die Dateinamen und Unterordnerstruktur nicht.
-- Beim ersten Aufruf werden ungefähr 7 MB geladen. Danach kann das Spiel aus dem Browsercache offline starten.
-- Spielstand und Einstellungen bleiben im jeweiligen Browser und werden nicht zwischen Geräten übertragen.
-- Bei einem späteren Update alle Dateien gemeinsam ersetzen, damit Programm und Grafikversion zusammenpassen.
-- Die Datei _headers setzt Sicherheits- und Aktualisierungsregeln für Netlify. Sie muss mit hochgeladen werden.
-
-LOKAL TESTEN
-Ein Doppelklick auf index.html ist wegen Browser-Sicherheitsregeln nicht ausreichend für alle Funktionen. Starte im Ordner einen kleinen Webserver, zum Beispiel:
+LOCAL PREVIEW
+Run a static server in the repository root:
 
     python -m http.server 8080
 
-Dann http://localhost:8080 öffnen.
+Then open http://localhost:8080/. Do not rely on double-clicking index.html because browser security rules can block service-worker and audio behaviour.
 
-BEDIENUNG
-Auf dem Handy im Querformat spielen. Die Touch-Tasten entsprechen der APK. Im Browser funktionieren zusätzlich Pfeiltasten/A/D, Leertaste, S/J, W, G, M und Esc. Die Taste ⛶ schaltet in den Vollbildmodus.
+IMPORTANT
+- HTTPS is required for installation and reliable offline caching; Netlify provides it automatically.
+- _headers contains the security and update rules and must be deployed.
+- Saved progress, settings and scores live in the current browser and are not synchronized between devices.
+- The first visit downloads the artwork and soundtrack. Later visits can start from the offline cache.
+- Phones should use landscape orientation.
 
-Die Ausgangskarte und alle oben geforderten Dosen/Lollis sind nötig. Direkt neben der Tür EXIT ↑ drücken. Das Spiel zeigt an, was noch fehlt.
+VERSION 2.12.2
+- Six Easy-mode hearts now fit completely in the phone HUD.
+- Down assists entry into nearby narrow shafts while preserving solid walls, locks and hazards.
+- Holding Jump assists alignment into narrow upward passages.
+- Easy / Medium / Hard start with 6 / 4 / 3 hearts and use slower / normal / faster hostile movement.
+- Music volume, optional checkpoints and God Mode remain independently configurable.
+- Cans and lollipops are optional and worth 100 points each; only the EXIT card is required to finish a normal world.
+- Every world includes one moving bonus heart.
+- The complete recorded soundtrack remains available offline after caching.
 
-## Web version 2.6
-
-- First-play guide explains controls, exit cards, collection goals and optional checkpoints. Replay it from Settings / How to Play.
-- World 02 is marked Start here on the home screen, world selector and space-station door.
-- Enable Checkpoints in Settings, then use the flag button or C on safe solid ground. Saves include items, consumed keys, locks and enemies. Death restores the snapshot with full health. Checkpoints are session-only and clear when restarting or leaving a level; disabling them clears the saved point.
-- The completion screen shows playing time (including failed attempts), retries, overall progress and a share action. Sharing uses the device share sheet, clipboard, or selectable text. Links offer the corresponding world without bypassing the finale lock.
-- Original level geometry is unchanged. The Android APK remains version 2.5.
-
-Validation: 34 Node tests pass, including state restoration, reset behaviour, first-play guide, completion and sharing fallbacks. Browser checks covered the guide, checkpoint button and shared-world entry at 844 × 390. The completion layout was checked at the same size using a fixture generated by the completion-flow test.
-
-## Web version 2.7 — soundtrack
-User-supplied Suno songs: Little Willy Theme (menu), Space Station (hub), Crystal Caves (ice levels 02 and 17). Other worlds retain synthesized themes. Music is switchable separately from effects. Tracks are MP3 160 kbps stereo, normalized to -19 LUFS with gentle boundary fades; these are whole-song repeats, not beat-matched seamless loops. Tracks load on demand and are available offline after successful loading. Downloaded WAV masters are untouched. Android APK remains 2.5.
-
-## Web version 2.8 — complete soundtrack
-Eight additional Suno songs cover sandstone ruins, lava worlds, alien and lunar worlds, the golden labyrinth, neon stations and laboratories, the final prison and the ending. Every map now has recorded music. Little Victory plays once after a completed level; Home Together follows it after the finale. Music remains independently switchable and loads on demand. WAV masters are untouched. Android APK remains 2.5.
+Validation: 75 automated tests pass, including all original-map entrances, the Map 09 narrow passage, exits, keys, hazards, bonus hearts, checkpoints, difficulty settings, score persistence, audio and soundtrack packaging.

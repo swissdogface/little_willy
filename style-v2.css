@@ -11,3 +11,8 @@
 #hint{top:72px;left:0;right:0;height:36px;transform:none;display:flex;align-items:center;justify-content:center;padding:3px 16px;border-radius:0;background:#101e2e;border-bottom:1px solid #344d62;font-size:18px;font-weight:650;line-height:1.2;white-space:normal;text-align:center;color:#edf7ff}
 @media(max-height:440px){.topbar{height:100px;padding-bottom:40px}#hint{top:66px;height:34px;font-size:16px;padding:2px 12px}}
 #difficultySetting{font:inherit;font-size:16px;color:#ffe1a5;background:#213548;border:1px solid #779bae;border-radius:12px;min-height:44px;min-width:110px;padding:8px 12px;touch-action:manipulation;flex-shrink:0;color-scheme:dark}
+
+/* Easy mode has six hearts. Reserve their full width so the last one cannot
+   disappear behind the following HUD statistic on compact phone layouts. */
+.health{min-width:108px;flex:0 0 108px}.health #hearts{display:block;font-size:15px;letter-spacing:0;line-height:1.1}
+@media(max-width:900px){.health{min-width:88px;flex-basis:88px}.health #hearts{font-size:13px}}

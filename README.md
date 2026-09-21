@@ -1,188 +1,91 @@
-# Little Willy — "Where is mama?" (Browser-Remake)
+# Little Willy — Back on Earth II
 
-Browser-Remake des DOS-Spiels **Little Willy v1.1** (© 1993/1994
-I. Mustun / Dimension 16 & M.B. Soft) mit den originalen Levels, dem
-originalen Vorspann samt Story und der originalen Spielmechanik. Die komplette Logik (Laufen, Springen, Fallen,
-Gegner, Items, Schuss, Energie) wurde aus der `LW5.EXE` rekonstruiert
-und läuft wie im Original mit 35 Logikbildern pro Sekunde auf einer
-Welt aus 16x16-Kacheln. Die Grafik wird in der nativen Auflösung
-320x200 gezeichnet und ganzzahlig, pixelgenau skaliert.
+![Little Willy jumping through an alien world](hero-adventure.png)
 
-## Spielen
+A modern browser remaster of **Little Willy v1.1**, the DOS platform game created by I. Mustun / Dimension 16 and M.B. Soft in 1993–1994.
 
-Einen statischen Webserver im Projektordner starten, z. B.:
+The original 24 maps, world themes and level geometry return with high-resolution cartoon artwork, modern controls, shooting, music, touch support and adjustable difficulty.
 
-```bash
-python3 -m http.server 8000
-# dann http://localhost:8000 öffnen
-```
+**Current version: 2.12.2** · [Play Little Willy](https://little-willy.netlify.app/)
 
-(Direktes Öffnen von `index.html` per Doppelklick funktioniert nicht,
-weil das Spiel seine Daten per `fetch` lädt.)
+## Highlights
 
-## Steuerung (wie im Original)
+- All 24 original worlds and the Earth II space station
+- High-resolution environments, animated Willy and remastered enemies
+- A different recorded soundtrack for each world theme, with music volume control
+- Keyboard, touch and installable web-app support
+- Easy, Medium and Hard difficulty
+- Optional God Mode and checkpoints
+- More forgiving steering into narrow passages on phones
+- One hidden bonus heart in every world
+- Personal high scores and completed-world markers stored on the device
+- Shareable completion screen after each finished world
 
-| Taste                  | Aktion                        |
-|------------------------|-------------------------------|
-| `A` / `Space` / `↑`    | Springen (gehalten: Dauersprung) |
-| `S` / `Ctrl` / `X`     | Schiessen                     |
-| `,` / `←`              | Nach links                    |
-| `.` / `→`              | Nach rechts                   |
-| `Esc`                  | Menü / Pause, in der Story: überspringen |
-| `M` / `O` / `F`        | Musik, Effekte, Vollbild      |
-| `G`                    | God-Modus (Cheat) ein und aus |
-| `Y` / `T` (im Menü)    | Story nochmals ansehen, Titelbild |
+## How to play
 
-Gamepads werden unterstützt, auf Touch-Geräten erscheinen
-Bildschirmtasten.
+Find the **EXIT card**, then reach the EXIT door. Cans and lollipops are optional and award **100 points each**. Green, red and yellow keys open locks of the matching colour.
 
-## Vorspann und Story
+| Control | Action |
+| --- | --- |
+| `←` / `→` or `A` / `D` | Move |
+| `Space` | Jump; hold it for a higher jump |
+| `↓` | Drop through thin platforms and enter narrow shafts more easily |
+| `S` / `J` | Shoot |
+| `↑` / `W` | Enter a door or use the EXIT |
+| `C` | Save an enabled checkpoint on safe ground |
+| `G` | Toggle God Mode |
+| `M` | Toggle music |
+| `Esc` | Pause |
 
-Der Ablauf beim Start ist der des Originals:
+Touch controls appear automatically on phones and tablets. Landscape orientation is recommended.
 
-1. **«Dimension 16 & M.B. Soft presents»** (`DIM.DAT`): das Bild wird
-   Palettenfarbe für Palettenfarbe eingeblendet, bleibt rund drei
-   Sekunden stehen oder bis eine Taste gedrückt wird und wird gleich
-   wieder ausgeblendet.
-2. **Titelbild** (`TITLE2.DAT`, 320x400): oben der Titel, unten die
-   Credits. Wie im Original hält das Bild gut vier Sekunden und scrollt
-   dann mit zwei Zeilen pro Bildwechsel zur anderen Hälfte und zurück.
-   Eine Taste blendet zum Menü aus.
-3. **Story** bei einem neuen Spiel oder mit `Y` im Menü: die vier
-   Storybilder lösen sich nacheinander per Zufallsmuster ins Bild auf
-   (der «Dissolve» der EXE). Nach dem zweiten und vierten Bild
-   erscheinen die Originaltexte aus `TEXT0.DAT` und `TEXT1.DAT`
-   absatzweise als Kasten beziehungsweise Sprechblase über dem Bild:
-   die Zeilen schliessen sich von oben und unten mit einer weissen
-   Kante, dann wartet `>KEY<` auf eine Taste. Am Schluss löst sich
-   alles nach Schwarz auf. `Esc` überspringt die Story.
+## Difficulty and health
 
-## Das Spiel
+| Mode | Starting health | Enemy speed |
+| --- | ---: | ---: |
+| Easy | 6 hearts | 75% |
+| Medium | 4 hearts | 100% |
+| Hard | 3 hearts | 120% |
 
-Willys Mutter wurde entführt. Vom **Galactic Train**, einem Labyrinth
-aus Mondsteinen, führen 24 Türen in 24 Welten. Eine Tür betritt man,
-indem man hineinläuft. In jedem Level:
+Hazards and enemy contact remove one heart and give Willy a short recovery period. A moving bonus heart adds one health point. God Mode remains available at every difficulty and makes Willy invincible; the EXIT card and matching keys are still part of the adventure.
 
-- Finde die **EXIT-CARD**, sonst bleibt der Ausgang zu.
-- Sammle alle **Drink-Boxes** bzw. **Lollypops** (Zähler oben rechts).
-- Die farbigen **Karten** stecken in unsichtbaren Steinen und lassen
-  sich nur mit dem passenden **Schlüssel** nehmen; danach ist der Stein
-  weg.
-- Willy hat pro Level **vier Energiepunkte** (Herzen). Sind sie weg oder
-  berührt er ein tödliches Feld, beginnt das Level von vorn.
-- Gegner lassen sich abschiessen; manche brauchen mehrere Treffer,
-  manche sind unverwundbar. Auf Plattformen und Aufzügen kann Willy
-  mitfahren.
+Runs using Easy difficulty, God Mode or checkpoints are recorded separately as assisted high scores.
 
-Erst wenn alle anderen Türen geschafft sind, öffnet sich Tür 1: das
-Gefängnis, in dem Mama festgehalten wird.
+## Web app and offline play
 
-Der Spielfortschritt (geschaffte Türen) wird automatisch im Browser
-gespeichert (`localStorage`).
+The site can be installed from a supported browser with **Install App**. This creates a Progressive Web App that opens like a standalone application and can use cached files offline. It is separate from the native Android APK.
 
-## God-Modus (Cheat)
+Progress, settings and scores are stored locally in the current browser. They do not automatically transfer between browsers or devices.
 
-Das Original ist bockschwer, darum gibt es einen Unsterblichkeits-Modus.
-Mit `G` lässt er sich jederzeit ein und ausschalten, im Menü ebenso wie
-mitten im Level. Ist er aktiv, werden die Herzen golden und oben links
-steht `GOD`.
+## Run locally
 
-Was der Modus abschaltet:
-
-- Schaden durch Gegner und durch die verletzenden Plattformen
-- tödliche Kacheln (Stacheln, Lava, Dornen)
-- damit auch jeden Levelneustart durch Sterben
-
-Was der Modus dazugibt, jeweils beim Levelstart und beim Einschalten
-mitten im Level:
-
-- die **Exit-Card**, der Ausgang ist also sofort offen
-- alle drei **Schlüssel**
-- alle **Karten** samt ihren mystischen Steinen, die sich auflösen
-- den Zähler für Drink-Boxes und Lollypops auf null
-
-- **Tür 1**, das Finale mit dem Gefängnis, ist sofort begehbar, statt
-  erst nach den übrigen 24 Türen
-
-Zu tun bleibt der Weg zum Ausgang. Die Sammelobjekte liegen weiterhin
-herum und dürfen eingesammelt werden, sie zählen nur nicht mehr. Auch
-die Falle von Level 20, wo das Nehmen der Drink-Boxes den Ausgang
-verriegelt, greift im God-Modus nicht mehr.
-
-Im normalen Modus bleibt alles wie im Original, die Falle von Level 20
-eingeschlossen.
-
-Die Einstellung wird mitgespeichert. Auf Touch-Geräten ohne Tastatur
-lässt sie sich per URL setzen: `?god=1` schaltet ein, `?god=0` aus.
-
-## Projektstruktur
-
-```
-original/     Original-DOS-Dateien (LEV/SPR/BST/DAT + LW5.EXE)
-tools/        extract.py: dekodiert die Originalformate und erzeugt die
-              Assets (JSON + PNG in Originalauflösung)
-              font.py: erzeugt die 5x7-Bitmap-Schrift (js/font.js)
-assets/       generierte Spieldaten und Grafiken
-js/           Engine: game.js (Simulation), render.js, audio.js,
-              input.js, assets.js, font.js, main.js (Ablauf)
-index.html    Einstieg
-```
-
-## Rekonstruierte Mechanik (Auszug aus LW5.EXE)
-
-- **Zeitbasis**: ein Seitenwechsel je 25 ms BIOS-Timer plus
-  Bildsynchronisation, also 35 Logikbilder pro Sekunde.
-- **Laufen**: 2 px pro Bild. Kollisionsproben bei `x+14`/`x+12`
-  (rechts) und `x-4`/`x-2` (links) in den Kachelzeilen `y>>4` und
-  `(y+15)>>4`. Nur Attribut 1 (solide) blockiert seitlich.
-- **Springen**: feste Tabelle `4 8 12 16 20 24 27 30 32 35 37 39 40 41
-  42 43 43 44`, 18 Bilder aufwärts, gespiegelt abwärts, 37 Bilder
-  insgesamt. Kopfstoss an Decken, Landung rastet aufs Kachelraster ein.
-  Gehaltene Sprungtaste springt erneut.
-- **Fallen**: 6, 4 oder 2 px pro Bild, je nachdem, wie nah der Boden ist.
-- **Kachelattribute**: 0 frei, 1 solide, 2 Plattform (von unten
-  durchspringbar, seitlich passierbar, als Boden tragend), 3 tödlich.
-- **Gegner**: Geschwindigkeit, Patrouillengrenzen, Richtungstyp (0
-  rechts, 1 links, 2 auf, 3 ab, 4 Bogen, 5 Hüpfen, 6 Zufallslauf, 7
-  verfolgend), Art (0 Gegner, 1 Plattform, 2 verletzende Plattform),
-  Trefferpunkte (255 = unverwundbar), Animationsprogramm aus
-  Dauer/Sprite-Paaren. Geschwindigkeiten ab 100 sind Schleicher
-  (1 px alle `speed-100` Schritte).
-- **Schuss**: 4 px pro Bild, nach 8 Bildern 6 px, endet an Wänden oder
-  am Bildrand, Explosion mit den Willy-Sprites 22 bis 26.
-- **Türen**: die 24 Türpositionen des Hubs sind in der EXE fest
-  kodiert (Tür n führt zu Level n).
-- **Soundeffekte**: die PC-Speaker-Sequenzen der EXE (Frequenz/Dauer),
-  als weiche Rechteckwelle wiedergegeben.
-- **Bildschirme**: die `.DAT`-Bilder tragen die Windows-Palette, die EXE
-  mappt jeden Farbindex beim Laden auf sein EGA-Attribut um (zum
-  Beispiel 1 auf 4, 4 auf 1, 7 auf 8, 8 auf 7). Der Export macht dasselbe,
-  darum haben Vorspann, Story, Level 1 und Abspann exakt die Farben der
-  Sprites.
-- **Übergänge**: Ein- und Ausblenden setzt die 16 Palettenregister
-  nacheinander (3 Bildwechsel pro Register). Der Dissolve kopiert 32000
-  zufällige Bytes der verdeckten Seite in die sichtbare, alle 700 einen
-  Bildwechsel lang; der Zufallsbereich wächst mit dem Zähler, darum
-  sickert ein Bild zuerst von oben ein. Die Textabsätze (50 bzw. 39
-  Zeilen) werden bei `x=16, y=134` beziehungsweise `x=152, y=25`
-  zeilenpaarweise von aussen nach innen kopiert, alle 3 Bildwechsel
-  ein Paar.
-- **Abspann**: nach Level 1 zeigt das Original die Grafik `END.DAT` und
-  animiert dazu die Sprites aus `LEND.SPR` mit einem festen Programm.
-  Mama wartet, bückt sich, hebt Willy hoch, dann blitzt das Paar weiss
-  auf und verschwindet, bevor die Schleife von vorn beginnt. Dass die
-  Siegesgrafik «GAME OVER» zeigt, ist so im Original angelegt.
-
-### Assets neu generieren
+No build step, framework, database or server-side code is required. Serve the repository root with any static web server:
 
 ```bash
-pip install pillow
-python3 tools/extract.py
-python3 tools/font.py
+python -m http.server 8080
 ```
 
-## Debug
+Then open <http://localhost:8080/>. Opening `index.html` directly may prevent service-worker and audio features from working correctly.
 
-`?level=N` in der URL startet direkt in Level N (0 = Hub),
-optional mit `&x=..&y=..` für die Startposition und `&god=1` für den
-God-Modus.
+## Deploy to Netlify
+
+This repository is ready for Netlify. `netlify.toml` publishes the repository root and `_headers` supplies the required cache and security headers. Connect the repository to Netlify or drag the complete web ZIP into Netlify Drop.
+
+See [HOSTING.txt](HOSTING.txt) for update and cache instructions. Release history is in [CHANGELOG.md](CHANGELOG.md).
+
+## Main files
+
+| Path | Purpose |
+| --- | --- |
+| `index.html` | Game shell and interface |
+| `engine-v2.js` | Platforming, collision, items, enemies and level state |
+| `game-v2.js` | Controls, audio, menus, progress and game flow |
+| `renderer.js`, `modern-art.js` | Modern visual rendering and animation |
+| `levels.js` | Imported original maps and entities |
+| `soundtrack.js`, `music-*.mp3` | World soundtrack selection and music files |
+| `assets/`, `original/` | Preserved original graphics and DOS game data |
+| `service-worker.js` | Offline cache for the installable web app |
+
+## Credits
+
+Based on the original game by **I. Mustun / Dimension 16 and M.B. Soft**. The remaster preserves the original level layouts while presenting them with new artwork, music and accessibility options.
