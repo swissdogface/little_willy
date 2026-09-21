@@ -7,7 +7,7 @@ const HEAD_INSET=2,CORNER_ASSIST=4;
 // Empty, reachable positions checked against the original maps (heart-routes.json).
 const HEART_POSITIONS={"1":[465,176],"2":[127,291],"3":[383,32],"4":[479,128],"5":[479,208],"6":[592,272],"7":[417,224],"8":[47,352],"9":[593,352],"10":[622,272],"11":[463,80],"12":[593,256],"13":[528,352],"14":[240,64],"15":[593,352],"16":[15,224],"17":[591,16],"18":[50,32],"19":[47,112],"20":[416,320],"21":[63,16],"22":[561,192],"23":[176,96],"24":[97,128]};
 class Game {
- constructor(levels,options={}){this.levels=levels;this.god=!!options.god;this.gentle=!!options.gentle;this.done=options.done||[];this.events=[];this.load(0);}
+ constructor(levels,options={}){this.levels=levels;this.god=!!options.god;this.difficulty=['easy','medium','hard'].includes(options.difficulty)?options.difficulty:options.gentle?'easy':'medium';this.gentle=this.difficulty==='easy';this.done=options.done||[];this.events=[];this.load(0);}
  emit(type,data={}){this.events.push({type,...data});}
  load(index){
   this.checkpoint=null;this.usedCheckpoint=false;this.retries=0;this.nearDoor=null;this.index=clamp(index,0,this.levels.length-1);this.level=this.levels[this.index];this.time=0;this.complete=false;this.events=[];this.shots=[];this.sparks=[];this.keys=[0,0,0];this.card=false;this.collected=0;this.cooldown=0;this.jumpBuffer=0;this.drop=0;this.doorCooldown=0;this.wasNearExit=false;
@@ -15,10 +15,12 @@ class Game {
   const heart=HEART_POSITIONS[this.index];
   if(heart&&this.level.theme)this.items.push({id:this.items.length,x:heart[0],y:heart[1],w:16,h:16,kind:4,taken:false});
   this.enemies=this.level.enemies.map((e,id)=>({...e,id,alive:true,flash:0,dx:0,dy:0,dirX:[1,-1,0,0,1,-1,1,-1][e.direction]||0,dirY:[0,0,-1,1,-1,-1,1,1][e.direction]||0}));
-  this.player={x:this.level.spawn.x+2,y:this.level.spawn.y,w:12,h:16,vx:0,vy:0,face:this.level.facing===12?1:-1,hp:this.gentle?6:4,invincible:1.4,grounded:false,coyote:0,ride:null};
+  this.player={x:this.level.spawn.x+2,y:this.level.spawn.y,w:12,h:16,vx:0,vy:0,face:this.level.facing===12?1:-1,hp:this.startHearts,invincible:1.4,grounded:false,coyote:0,ride:null};
  }
  setGod(on){this.god=!!on;this.emit('god');}
- setGentle(on){this.gentle=!!on;this.player.hp=Math.min(this.player.hp,(this.gentle?6:4)+(this.items.some(i=>i.kind===4&&i.taken)?1:0));}
+ get startHearts(){return this.difficulty==='easy'?6:this.difficulty==='hard'?3:4;}
+ setDifficulty(value){this.difficulty=['easy','medium','hard'].includes(value)?value:'medium';this.gentle=this.difficulty==='easy';}
+ setGentle(on){this.setDifficulty(on?'easy':'medium');}
  snapshot(){return {index:this.index};}
  setCheckpoints(on){this.checkpoints=!!on;if(!on)this.checkpoint=null;}
  saveCheckpoint(){
@@ -44,12 +46,12 @@ class Game {
  restart(){
   const saved=this.checkpoints&&this.checkpoint,elapsed=this.time,retries=(this.retries||0)+1,used=this.usedCheckpoint;
   this.load(this.index);this.time=elapsed;this.retries=retries;this.usedCheckpoint=used;
-  if(saved){const state=JSON.parse(JSON.stringify(saved));Object.assign(this,state);this.checkpoint=saved;Object.assign(this.player,{hp:(this.gentle?6:4)+(this.items.some(i=>i.kind===4&&i.taken)?1:0),invincible:2,vx:0,vy:0,ride:null});}
+  if(saved){const state=JSON.parse(JSON.stringify(saved));Object.assign(this,state);this.checkpoint=saved;Object.assign(this.player,{hp:this.startHearts+(this.items.some(i=>i.kind===4&&i.taken)?1:0),invincible:2,vx:0,vy:0,ride:null});}
   this.emit('respawn',{checkpoint:!!saved});
  }
  hurt(fatal=false){
   const p=this.player;if(this.god||p.invincible>0)return;
-  p.hp=fatal?0:p.hp-1;p.invincible=this.gentle?1.8:1.15;this.emit('hurt');
+  p.hp=fatal?0:p.hp-1;p.invincible=this.gentle?1.8:this.difficulty==='hard'?.95:1.15;this.emit('hurt');
   if(p.hp<=0){this.restart();this.events.unshift({type:'hurt'});return true;}return false;
  }
  tilesNear(rect){
@@ -129,7 +131,7 @@ class Game {
   for(const e of this.enemies){
    if(!e.alive)continue;const ox=e.x,oy=e.y;e.flash=Math.max(0,e.flash-dt);
    if(e.mode!==0){
-    const speed=(e.contact===1?36:44)*(this.gentle&&e.contact!==1?.75:1);
+    const speed=(e.contact===1?36:44)*(e.contact===1?1:this.gentle?.75:this.difficulty==='hard'?1.2:1);
     e.x+=e.dirX*speed*dt;e.y+=e.dirY*speed*dt;
     if(e.dirX&&e.x>=e.right){e.x=e.right;e.dirX=-1;}if(e.dirX&&e.x<=e.left){e.x=e.left;e.dirX=1;}
     if(e.dirY&&e.y>=e.bottom){e.y=e.bottom;e.dirY=-1;}if(e.dirY&&e.y<=e.top){e.y=e.top;e.dirY=1;}
@@ -164,7 +166,7 @@ class Game {
   for(const e of this.enemies)if(e.alive&&e.contact===0&&overlap({...p,x:p.x+1,y:p.y+2,w:p.w-2,h:p.h-3},{...e,x:e.x+2,y:e.y+2,w:Math.max(1,e.w-4),h:Math.max(1,e.h-4)}))if(this.hurt())return;
   for(const i of this.items){
    if(i.taken||i.kind===2||!overlap(p,{...i,x:i.x+2,y:i.y+2,w:12,h:12}))continue;
-   if(i.kind===4){p.hp=Math.min((this.gentle?6:4)+1,p.hp+1);i.taken=true;this.emit('heart',{x:i.x,y:i.y});continue;}
+   if(i.kind===4){p.hp=Math.max(p.hp,Math.min(this.startHearts+1,p.hp+1));i.taken=true;this.emit('heart',{x:i.x,y:i.y});continue;}
    if(i.kind===0){
     this.collected++;
    }else if(i.kind===1)this.keys[i.sprite-81]++;
