@@ -85,9 +85,9 @@ class Game {
   const p=this.player,oldY=p.y,wasGrounded=p.grounded;p.y+=dy;p.grounded=false;p.ride=null;
   // Let a directed jump skim a nearby ceiling edge instead of losing all lift.
   // Both sweeps must be clear: this cannot pass through a wall or locked door.
-  if(dy<0&&p.vx){
+  if(dy<0&&(p.vx||this.jumpAssist)){
    const hits=this.tilesNear(this.playerBody()).filter(t=>t.kind===1&&overlap(this.playerBody(),t));
-   const candidates=hits.flatMap(t=>[t.x-p.w,t.x+t.w]).filter(x=>x>=0&&x+p.w<=640&&Math.abs(x-p.x)<=8&&(x-p.x)*p.vx>0).sort((a,b)=>Math.abs(a-p.x)-Math.abs(b-p.x));
+   const candidates=hits.flatMap(t=>[t.x-p.w,t.x+t.w]).filter(x=>x>=0&&x+p.w<=640&&Math.abs(x-p.x)<=8&&(!p.vx||(x-p.x)*p.vx>0)).sort((a,b)=>Math.abs(a-p.x)-Math.abs(b-p.x));
    for(const x of candidates){
     const side={...this.playerBody(Math.min(x,p.x),oldY),w:p.w+Math.abs(x-p.x)},rise={...this.playerBody(x,p.y),h:p.h-HEAD_INSET-dy};
     if([side,rise].some(body=>this.tilesNear(body).some(t=>(t.kind===1||t.kind===3)&&overlap(body,t))))continue;
@@ -106,8 +106,10 @@ class Game {
   }
   // A falling body may miss a shaft by a few pixels. Slide past the lip only
   // when both the sideways sweep and the complete downward path are clear.
-  if(floor&&floor.kind===1&&dy>0&&!wasGrounded){
-   const candidates=[floor.x-p.w,floor.x+floor.w].filter(x=>x>=0&&x+p.w<=640&&Math.abs(x-p.x)<=4&&(!p.vx||(x-p.x)*p.vx>=0)).sort((a,b)=>Math.abs(a-p.x)-Math.abs(b-p.x));
+  // Explicit Down also releases a body already resting on the lip. Neutral
+  // movement retains the small passive allowance; steering away always wins.
+  if(floor&&floor.kind===1&&dy>0&&(!wasGrounded||this.downAssist)){
+   const candidates=[floor.x-p.w,floor.x+floor.w].filter(x=>x>=0&&x+p.w<=640&&Math.abs(x-p.x)<=(this.downAssist?8:4)&&(!p.vx||(x-p.x)*p.vx>=0)).sort((a,b)=>Math.abs(a-p.x)-Math.abs(b-p.x));
    for(const x of candidates){
     const sideways={...this.playerBody(Math.min(x,p.x),oldY),w:p.w+Math.abs(x-p.x)},downward={...this.playerBody(x,oldY),h:p.h-HEAD_INSET+dy};
     if(this.blocked(sideways)||this.tilesNear(downward).some(t=>overlap(downward,t)))continue;
@@ -127,6 +129,7 @@ class Game {
  }
  step(dt,input={}){
   if(this.complete)return;dt=clamp(dt,0,1/30);this.time+=dt;const p=this.player;
+  this.downAssist=!!input.down;this.jumpAssist=!!(input.jump||input.jumpHeld);
   p.invincible=Math.max(0,p.invincible-dt);this.cooldown=Math.max(0,this.cooldown-dt);this.drop=Math.max(0,this.drop-dt);this.doorCooldown=Math.max(0,this.doorCooldown-dt);
   for(const e of this.enemies){
    if(!e.alive)continue;const ox=e.x,oy=e.y;e.flash=Math.max(0,e.flash-dt);
