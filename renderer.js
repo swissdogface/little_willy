@@ -364,6 +364,10 @@ function draw(g,game,view,time){
  for(const i of game.items)if(!i.taken){if(i.kind===4)pickupHeart(g,i.x,i.y,time);else sprite(g,game.level,i.sprite,i.x,i.y);}
  for(const e of game.enemies){
   if(!e.alive)continue;const period=e.animation.reduce((a,f)=>a+f[0],0);let t=Math.floor(time*12)%period,frame=e.animation[0][1];for(const f of e.animation){frame=f[1];if(t<f[0])break;t-=f[0];}
+  // In the volcano maps this old background animation reuses Willy's DOS
+  // sprite bank. It is not the player and must not trail the Swiss cheese man.
+  const source=game.level.spriteMap[e.animation[0][1]];
+  if(game.level.theme==='L04'&&source?.[0]==='WILLY'&&source[1]<=21)continue;
   const turnBoy=game.level.theme==='L04'&&frame>=52&&frame<=59;
   sprite(g,game.level,frame,e.x,e.y,turnBoy&&e.dirX<0,e.flash>0?.45:1,time,e);
   if(e.contact===1&&hd){g.strokeStyle='rgba(216,255,255,.8)';g.lineWidth=.35;g.beginPath();g.moveTo(e.x,e.y);g.lineTo(e.x+e.w,e.y);g.stroke();}
