@@ -81,11 +81,11 @@ function iceSprite(g,id,x,y,alpha){
  }else {g.restore();return false;}
  g.restore();return true;
 }
-function worldEnemy(g,level,id,x,y,alpha,flip=false){
+function worldEnemy(g,level,id,x,y,alpha,flip=false,time=null,entity=null){
  // Complete eight-frame walking boy for Map 04. His neutral artwork faces right;
  // the live horizontal velocity mirrors every frame when he turns left.
  if(level.theme==='L04'&&id>=52&&id<=59){
-  const phase=(id-52)*Math.PI/4,stride=Math.sin(phase)*2.2,bob=Math.abs(Math.sin(phase))*.65;
+  const motion=entity&&window.WillyModernArt?.gait(entity,time),phase=motion?motion.distance/24*Math.PI*2:(id-52)*Math.PI/4,stride=Math.sin(phase)*2.2,bob=Math.abs(Math.sin(phase))*.65;
   g.save();g.globalAlpha=alpha;g.translate(x+14.5,y+14.5+bob);if(flip)g.scale(-1,1);g.translate(-14.5,-14.5);
   const edge='#493426';g.lineCap='round';g.lineJoin='round';
   // Warm, rounded Alpine outfit; the cross stays unobstructed in every pose.
@@ -120,7 +120,7 @@ function worldEnemy(g,level,id,x,y,alpha,flip=false){
  if(id<31||id>52)return false;
  // The original eight-frame wheel in Map 04 is a rolling Swiss cheese.
  if(level.theme==='L04'&&id>=36&&id<=43){
-  g.save();g.globalAlpha=alpha;g.translate(x+14,y+14);g.rotate((43-id)*Math.PI/4);
+  g.save();g.globalAlpha=alpha;g.translate(x+14,y+14);g.rotate(entity?x/12.2:(43-id)*Math.PI/4);
   g.shadowColor='rgba(255,190,45,.55)';g.shadowBlur=3;
   const rind=g.createRadialGradient(-4,-5,1,0,0,13);rind.addColorStop(0,'#fff2a1');rind.addColorStop(.58,'#f6c83d');rind.addColorStop(1,'#b96c12');
   ellipse(g,0,0,12.2,12.2,rind);g.shadowBlur=0;g.strokeStyle='#5d3414';g.lineWidth=1;g.stroke();
@@ -133,8 +133,9 @@ function worldEnemy(g,level,id,x,y,alpha,flip=false){
  // Unmapped artwork uses its original contours, including every animation frame.
  return false;
 }
-function sprite(g,level,id,x,y,flip=false,alpha=1,time=0,entity=null){if(hd&&window.WillyModernArt?.sprite(g,level,id,x,y,flip,alpha,time,entity))return;if(hd&&id>=80&&iceSprite(g,id,x,y,alpha))return;if(hd&&worldEnemy(g,level,id,x,y,alpha,flip))return;const ref=level.spriteMap[id];if(!ref)return;const d=WILLY_ART.sprites[ref[0]]?.[ref[1]];if(!d)return;const im=renderShape(d,'s'+ref.join(':'));g.save();g.globalAlpha=alpha;if(flip){g.translate(x+d.w-8,y);g.scale(-1,1);g.drawImage(im,0,0,d.w,d.h);}else g.drawImage(im,x,y,d.w,d.h);g.restore();}
+function sprite(g,level,id,x,y,flip=false,alpha=1,time=0,entity=null){if(hd&&window.WillyModernArt?.sprite(g,level,id,x,y,flip,alpha,time,entity))return;if(hd&&id>=80&&iceSprite(g,id,x,y,alpha))return;if(hd&&worldEnemy(g,level,id,x,y,alpha,flip,time,entity))return;const ref=level.spriteMap[id];if(!ref)return;const d=WILLY_ART.sprites[ref[0]]?.[ref[1]];if(!d)return;const im=renderShape(d,'s'+ref.join(':'));g.save();g.globalAlpha=alpha;if(flip){g.translate(x+d.w-8,y);g.scale(-1,1);g.drawImage(im,0,0,d.w,d.h);}else g.drawImage(im,x,y,d.w,d.h);g.restore();}
 let map=null,mapId='',finale=new Image();finale.src='finale-original.png';
+const lavaSurface=new Image();lavaSurface.src='lava-surface-hd.png';lavaSurface.onload=()=>{mapId='';};
 const materials=new Image();materials.src='materials-hd.png';materials.onload=()=>{mapId='';};
 const iceBackdrop=new Image();iceBackdrop.src='ice-caves-backdrop.png';iceBackdrop.onload=()=>{mapId='';};
 const finaleBackdrop=new Image();finaleBackdrop.src='finale-backdrop.png';finaleBackdrop.onload=()=>{mapId='';};
@@ -197,8 +198,16 @@ function hazardTile(g,level,i){
   g.beginPath();g.moveTo(.5,15.5);g.lineTo(4,0);g.lineTo(8,14);g.lineTo(12,0);g.lineTo(15.5,15.5);g.closePath();g.fill();g.stroke();
   g.strokeStyle=light;g.lineWidth=.7;g.beginPath();g.moveTo(1.8,13);g.lineTo(4,1.5);g.moveTo(9.4,13);g.lineTo(12,1.5);g.stroke();
   rounded(g,.3,14.5,15.4,1.4,.4,base);
+ }else if(style==='lava'){
+  // Sample a continuous painted surface in world coordinates: no per-tile seams.
+  if(lavaSurface.complete&&lavaSurface.naturalWidth){
+   const exposed=i<40||(level.tiles[i-40]>>6)!==3,sy=exposed?0:lavaSurface.naturalHeight*.35;
+   g.drawImage(lavaSurface,(x%64)/64*lavaSurface.naturalWidth,sy,lavaSurface.naturalWidth/4,lavaSurface.naturalHeight-sy,0,0,16,16);
+  }else{
+   const heat=g.createLinearGradient(0,0,0,16);heat.addColorStop(0,'#ffdc83');heat.addColorStop(.2,'#ef571d');heat.addColorStop(1,'#49202a');g.fillStyle=heat;g.fillRect(0,0,16,16);
+  }
  }else{
-  const [bright,main,dark]=style==='lava'?['#fff2a0','#ff651e','#8a182b']:style==='electric'?['#ffffdb','#e9de46','#705325']:['#e5ffb1','#80e631','#185940'];
+  const [bright,main,dark]=style==='electric'?['#ffffdb','#e9de46','#705325']:['#e5ffb1','#80e631','#185940'];
   const grad=g.createLinearGradient(0,0,0,16);grad.addColorStop(0,bright);grad.addColorStop(.17,main);grad.addColorStop(1,dark);g.fillStyle=grad;g.fillRect(0,0,16,16);
   const exposed=i<40||(level.tiles[i-40]>>6)!==3;
   if(exposed){g.strokeStyle=bright;g.lineWidth=1;g.beginPath();g.moveTo(0,.6);g.bezierCurveTo(4,2,5,0,8,.6);g.bezierCurveTo(12,2,13,0,16,.6);g.stroke();}
@@ -207,7 +216,6 @@ function hazardTile(g,level,i){
    g.beginPath();g.moveTo(0,9);g.lineTo(4,9);g.lineTo(7,4);g.lineTo(9,12);g.lineTo(12,7);g.lineTo(16,7);g.stroke();
   }else{
    for(const [bx,by,r] of [[4,6,1.3],[11,11,1.8]]){g.beginPath();g.arc(bx,by,r,0,Math.PI*2);g.stroke();}
-   if(style==='lava'){g.beginPath();g.moveTo(0,14);g.lineTo(5,10);g.lineTo(8,13);g.lineTo(16,9);g.stroke();}
   }
  }
  g.restore();
@@ -340,6 +348,7 @@ function pickupHeart(g,x,y,time){
  g.strokeStyle='#fff5fa';g.lineWidth=.8;g.beginPath();g.moveTo(-4,-3);g.quadraticCurveTo(-5,-1,-3,1);g.stroke();g.restore();
 }
 function draw(g,game,view,time){
+ time=game.time??time;
  prepare(game.level);g.save();g.beginPath();g.rect(view.x,view.y,view.w,view.h);g.clip();g.fillStyle='#08101c';g.fillRect(view.x,view.y,view.w,view.h);g.translate(view.x-view.camX*view.scale,view.y-view.camY*view.scale);g.scale(view.scale,view.scale);g.imageSmoothingEnabled=hd;
  if(map)g.drawImage(map,0,0,640,384);
  for(const e of game.level.extras)sprite(g,game.level,e.sprite,e.x,e.y,false,1,time);

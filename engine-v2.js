@@ -5,7 +5,7 @@ const overlap=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 // Keep the 16-pixel drawing and foot position; hair is outside the solid hitbox.
 const HEAD_INSET=2,CORNER_ASSIST=4;
 // Empty, reachable positions checked against the original maps (heart-routes.json).
-const HEART_POSITIONS={"1":[17,305],"2":[448,16],"3":[26,289],"4":[83,304],"5":[14,313],"6":[224,48],"7":[5,63],"8":[272,32],"9":[128,144],"10":[240,35],"11":[23,290],"12":[215,178],"13":[67,297],"14":[614,288],"15":[240,16],"16":[452,117],"17":[352,352],"18":[350,336],"19":[515,48],"20":[153,48],"21":[257,208],"22":[112,112],"23":[616,94],"24":[591,82]};
+const HEART_POSITIONS={"1":[465,176],"2":[127,291],"3":[383,32],"4":[479,128],"5":[479,208],"6":[592,272],"7":[417,224],"8":[47,352],"9":[593,352],"10":[622,272],"11":[463,80],"12":[593,256],"13":[528,352],"14":[240,64],"15":[593,352],"16":[15,224],"17":[591,16],"18":[50,32],"19":[47,112],"20":[416,320],"21":[63,16],"22":[561,192],"23":[176,96],"24":[97,128]};
 class Game {
  constructor(levels,options={}){this.levels=levels;this.god=!!options.god;this.gentle=!!options.gentle;this.done=options.done||[];this.events=[];this.load(0);}
  emit(type,data={}){this.events.push({type,...data});}
@@ -50,7 +50,7 @@ class Game {
  hurt(fatal=false){
   const p=this.player;if(this.god||p.invincible>0)return;
   p.hp=fatal?0:p.hp-1;p.invincible=this.gentle?1.8:1.15;this.emit('hurt');
-  if(p.hp<=0){this.restart();return true;}return false;
+  if(p.hp<=0){this.restart();this.events.unshift({type:'hurt'});return true;}return false;
  }
  tilesNear(rect){
   const result=[];const x0=clamp(Math.floor(rect.x/16),0,39),x1=clamp(Math.floor((rect.x+rect.w-.001)/16),0,39),y0=clamp(Math.floor(rect.y/16),0,23),y1=clamp(Math.floor((rect.y+rect.h-.001)/16),0,23);

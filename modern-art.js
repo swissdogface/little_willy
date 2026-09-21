@@ -23,13 +23,68 @@ window.WillyModernArt=(()=>{
    data.ready=true;
   };image.src=file;
  }
- sheet('hero','willy-character-atlas.png',2,2);sheet('enemies','enemy-character-atlas.png',4,4);
- function atlas(g,name,n,x,y,w,h,flip=false){
+ sheet('hero','willy-character-atlas.png',2,2);sheet('run','willy-run-atlas.png',4,2);sheet('enemies','enemy-character-atlas.png',4,4);
+ function atlas(g,name,n,x,y,w,h,flip=false,motion=null){
   const s=sheets[name];if(!s.ready)return false;const f=s.frames[n];if(!f)return false;
-  const scale=name==='hero'?Math.min(w/Math.max(...s.frames.map(f=>f.w)),h/Math.max(...s.frames.map(f=>f.h))):Math.min(w/f.w,h/f.h),dw=f.w*scale,dh=f.h*scale;
+  const scale=(name==='hero'||name==='run')?Math.min(w/Math.max(...s.frames.map(f=>f.w)),h/Math.max(...s.frames.map(f=>f.h))):Math.min(w/f.w,h/f.h),dw=f.w*scale,dh=f.h*scale;
   g.save();g.translate(x+w/2,y+h);if(flip)g.scale(-1,1);g.imageSmoothingEnabled=true;
-  g.drawImage(s.image,f.x,f.y,f.w,f.h,-dw/2,-dh,dw,dh);g.restore();return true;
+  if(motion){const im=animatedFrame(s,n,motion.kind,motion.phase);g.drawImage(im,-dw/2,-dh,dw,dh);}else g.drawImage(s.image,f.x,f.y,f.w,f.h,-dw/2,-dh,dw,dh);g.restore();return true;
  }
+
+ // Animation lives entirely in the renderer; physics and collision boxes never change.
+ const travel=new WeakMap(),cycles=new Map(),TAU=Math.PI*2;
+ function gait(entity,time){
+  if(!entity)return {distance:0,moving:false};
+  let s=travel.get(entity);if(!s){s={x:entity.x,y:entity.y,distance:0,time,moving:false,grounded:entity.grounded,landed:-10};travel.set(entity,s);}
+  if(time!==s.time){const d=Math.hypot(entity.x-s.x,entity.y-s.y);s.moving=d>.002&&d<24;if(s.moving)s.distance+=d;if(entity.grounded&&!s.grounded)s.landed=time;s.grounded=entity.grounded;s.x=entity.x;s.y=entity.y;s.time=time;}
+  return s;
+ }
+ function deform(kind,u,v,phase){
+  const wave=Math.sin(phase),edge=Math.max(0,(Math.abs(u-.5)-.19)/.31);let x=u,y=v;
+  if(['green-alien','purple-alien','bat','insect','moth'].includes(kind)){
+   // Fold the wing tips about their roots, leaving faces and eyes stable.
+   const wing=edge*Math.max(0,1-Math.abs(v-.48)/.35);
+   y+=wave*.18*wing;x+=(.5-u)*(.14+.12*wave)*wing;
+   if(v<.24)x+=Math.sin(phase*.5)*.015*(.24-v)/.24;
+  }else if(['knight','robot','imp','skeleton','snow','gold-bug'].includes(kind)){
+   const leg=Math.max(0,(v-.62)/.38),side=u<.5?1:-1;
+   x+=wave*.08*leg*side;y-=Math.max(0,wave*side)*.055*leg;
+   if(v>.4&&v<.7)x+=wave*.018*edge;
+  }else if(['orange-alien','worm'].includes(kind)){
+   const lower=Math.max(0,(v-.55)/.45);y-=lower*(.025+.025*Math.sin(phase+u*TAU));
+   x+=Math.sin(phase+u*TAU)*.022*lower;
+   if(v<.4)x+=Math.sin(phase*.5)*.022*(.4-v)/.4;
+  }else if(kind==='plant'){
+   x+=Math.sin(phase)*.035*Math.sin(v*Math.PI);
+   y+=(v-.48)*Math.sin(phase)*.035*Math.max(0,1-v/.8);
+  }else if(kind==='wizard'){
+   x+=Math.sin(phase+v*4)*.027*Math.max(0,(v-.45)/.55);
+  }else if(kind==='rocket'){
+   x+=Math.sin(phase*2)*.035*Math.max(0,(.4-u)/.4);
+  }
+  return [Math.max(0,Math.min(1,x)),Math.max(0,Math.min(1,y))];
+ }
+ function animatedFrame(sheet,index,kind,phase){
+  const frame=((Math.floor(phase/TAU*16)%16)+16)%16,key=kind+':'+frame;
+  if(cycles.has(key))return cycles.get(key);
+  const f=sheet.frames[index],canvas=document.createElement('canvas');canvas.width=160;canvas.height=Math.max(32,Math.round(160*f.h/f.w));
+  const c=canvas.getContext('2d'),cols=8,rows=10,W=canvas.width,H=canvas.height;
+  // Small connected triangles articulate wings/limbs; cached frames cost one draw during play.
+  function tri(src){const dst=src.map(([u,v])=>deform(kind,u,v,frame/16*TAU).map((n,i)=>n*(i?H:W)));
+   const [a,b,d]=src.map(([u,v])=>[u*W,v*H]),[A,B,D]=dst;
+   const det=(b[0]-a[0])*(d[1]-a[1])-(d[0]-a[0])*(b[1]-a[1]);
+   const xx=((B[0]-A[0])*(d[1]-a[1])-(D[0]-A[0])*(b[1]-a[1]))/det;
+   const xy=((D[0]-A[0])*(b[0]-a[0])-(B[0]-A[0])*(d[0]-a[0]))/det;
+   const yx=((B[1]-A[1])*(d[1]-a[1])-(D[1]-A[1])*(b[1]-a[1]))/det;
+   const yy=((D[1]-A[1])*(b[0]-a[0])-(B[1]-A[1])*(d[0]-a[0]))/det;
+   c.save();c.beginPath();const cx=(A[0]+B[0]+D[0])/3,cy=(A[1]+B[1]+D[1])/3;
+   dst.forEach(([x,y],i)=>{const dx=x-cx,dy=y-cy,len=Math.hypot(dx,dy)||1;c[i?'lineTo':'moveTo'](x+dx/len*.3,y+dy/len*.3);});c.closePath();c.clip();
+   c.transform(xx,yx,xy,yy,A[0]-xx*a[0]-xy*a[1],A[1]-yx*a[0]-yy*a[1]);c.drawImage(sheet.image,f.x,f.y,f.w,f.h,0,0,W,H);c.restore();
+  }
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){const a=[x/cols,y/rows],b=[(x+1)/cols,y/rows],c=[(x+1)/cols,(y+1)/rows],d=[x/cols,(y+1)/rows];tri([a,b,c]);tri([a,c,d]);}
+  cycles.set(key,canvas);return canvas;
+ }
+
  function family(ref){
   if(!ref)return null;const [bank,n]=ref;
   if(bank==='WILLY')return n<=21?'hero':n<=26?'insect':n>=29&&n<=30?'rocket':null;
@@ -64,7 +119,7 @@ window.WillyModernArt=(()=>{
   if(kind==='earth'){
    const r=Math.min(w,h)/2-.5,cx=w/2,cy=h/2;
    const sea=g.createRadialGradient(cx-r*.4,cy-r*.5,.2,cx,cy,r);sea.addColorStop(0,'#5de0f5');sea.addColorStop(.5,'#177bb7');sea.addColorStop(1,'#082754');
-   oval(g,cx,cy,r,r,sea);g.save();g.beginPath();g.arc(cx,cy,r-.5,0,7);g.clip();g.translate(cx,cy);g.scale(r,r);
+   oval(g,cx,cy,r,r,sea);g.save();g.beginPath();g.arc(cx,cy,r-.5,0,7);g.clip();g.translate(cx,cy);g.scale(r,r);g.rotate(phase*.025);
    g.fillStyle='#7cca88';g.beginPath();g.moveTo(-.8,-.55);g.bezierCurveTo(-.4,-.9,-.05,-.5,-.2,-.3);g.lineTo(-.4,-.15);g.lineTo(-.2,.03);g.lineTo(-.28,.24);g.lineTo(-.43,.15);g.lineTo(-.6,-.12);g.lineTo(-.83,-.21);g.closePath();g.fill();
    g.beginPath();g.moveTo(-.27,.15);g.bezierCurveTo(.15,.2,.16,.42,-.3,.88);g.lineTo(-.43,.41);g.closePath();g.fill();
    g.beginPath();g.moveTo(.12,-.65);g.bezierCurveTo(.6,-.86,1,-.5,.83,-.15);g.lineTo(.48,-.02);g.lineTo(.37,.22);g.lineTo(.19,.2);g.lineTo(.07,-.08);g.lineTo(.34,-.31);g.lineTo(.03,-.4);g.closePath();g.fill();oval(g,.65,.52,.22,.12,'#b7d698');
@@ -80,7 +135,7 @@ window.WillyModernArt=(()=>{
   }
   if(kind==='ufo'||kind==='cloud'){
    if(kind==='cloud'){for(let i=0;i<6;i++)oval(g,w*(i+.6)/6,h*(.55+(i%2)*.1),w/7,h*(.3+(i%2)*.1),gradient(g,'#f1fbff','#96b4cf',h));}
-   else{oval(g,w/2,h*.52,w*.32,h*.38,gradient(g,'#b0f7ff','#2d769e',h));oval(g,w/2,h*.72,w*.48,h*.2,metal);for(let i=0;i<5;i++)oval(g,w*(i+1)/6,h*.73,1,.7,i%2?gold:cyan);}
+   else{oval(g,w/2,h*.52,w*.32,h*.38,gradient(g,'#b0f7ff','#2d769e',h));oval(g,w/2,h*.72,w*.48,h*.2,metal);for(let i=0;i<5;i++)oval(g,w*(i+1)/6,h*.73,1,.7,Math.floor(phase*2+i)%5===0?gold:cyan);}
    return;
   }
   if(kind==='disk'||kind==='face-panel'||kind==='stone'){
@@ -107,21 +162,25 @@ window.WillyModernArt=(()=>{
   const w=entity?.w||Math.max(8,desc.w-8),h=entity?.h||desc.h,phase=time*5+(entity?.id||0);
   if(entity?.dirX)flip=kind==='knight'?entity.dirX>0:entity.dirX<0;
   g.save();g.globalAlpha=alpha;
-  if(kind==='hero'){const ok=atlas(g,'hero',1,x,y,w,h,flip);g.restore();return ok;}
+  if(kind==='hero'){hero(g,{...entity,x,y,face:flip?-1:1,vx:entity?.dx?40:0,grounded:true},time,false,false,entity);g.restore();return sheets.hero.ready;}
   if(Object.hasOwn(characters,kind)){
-   const frame=characters[kind],bob=(kind==='purple-alien'||kind==='green-alien'||kind==='bat')?(Math.sin(phase)+1)*.35:0;
-   const ok=atlas(g,'enemies',frame,x,y+bob,w,h-bob,flip);g.restore();return ok;
+   const frame=characters[kind],walk=gait(entity,time),flying=['purple-alien','green-alien','bat','insect','moth','wizard'].includes(kind);
+   const beat=flying?time*(kind==='insect'?25:kind==='wizard'?3:13)+(entity?.id||0)*1.7:walk.moving?walk.distance/22*TAU:['knight','robot','imp','skeleton','snow','gold-bug'].includes(kind)?0:time*2+(entity?.id||0);
+   const bob=flying?(Math.sin(beat*.5)+1)*.35:0;
+   const ok=atlas(g,'enemies',frame,x,y+bob,w,h-bob,flip,{kind,phase:beat});g.restore();return ok;
   }
   g.translate(x,y);object(g,kind,w,h,phase);g.restore();return true;
  }
- function hero(g,p,time,shooting,god){
+ function hero(g,p,time,shooting,god,track=p){
   if(!sheets.hero.ready)return false;
-  const frame=!p.grounded?3:Math.abs(p.vx)>1?(Math.floor(time*10)%2)+1:0;
+  const walk=gait(track,time),running=p.grounded&&walk.moving&&Math.abs(p.vx)>1;
+  const sheet=running&&sheets.run.ready?'run':'hero',frame=sheet==='run'?Math.floor(walk.distance/4)%8:!p.grounded?(p.vy>25?1:3):0;
+  const breath=(p.grounded&&!running?(1+Math.sin(time*2.6))*.12:0)+Math.max(0,1-(time-walk.landed)/.12)*.65;
   g.save();if(p.invincible>0&&!god&&Math.floor(time*14)%2===0)g.globalAlpha=.55;
   if(god){g.strokeStyle='#ffe9a3';g.lineWidth=.6;g.beginPath();g.ellipse(p.x+6,p.y+8,9,9,0,0,7);g.stroke();}
-  atlas(g,'hero',frame,p.x-4,p.y,20,16,p.face<0);
+  atlas(g,sheet,frame,p.x-4,p.y+breath,20,16-breath,p.face<0);
   if(shooting){const x=p.x+(p.face>0?15:-3);oval(g,x,p.y+7,2,1,'#fff3b1');}
   g.restore();return true;
  }
- return {family,entityFamily,sprite,hero,ready:()=>Object.values(sheets).every(s=>s.ready)};
+ return {family,entityFamily,sprite,hero,gait,deform,ready:()=>Object.values(sheets).every(s=>s.ready)};
 })();
