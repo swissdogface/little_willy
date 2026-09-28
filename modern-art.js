@@ -24,6 +24,7 @@ window.WillyModernArt=(()=>{
   };image.src=file;
  }
  sheet('hero','willy-character-atlas.png',2,2);sheet('run','willy-run-atlas.png',4,2);sheet('enemies','enemy-character-atlas.png',4,4);
+ sheet('finale','finale-props-hd.png',2,1);
  function atlas(g,name,n,x,y,w,h,flip=false,motion=null){
   const s=sheets[name];if(!s.ready)return false;const f=s.frames[n];if(!f)return false;
   const scale=(name==='hero'||name==='run')?Math.min(w/Math.max(...s.frames.map(f=>f.w)),h/Math.max(...s.frames.map(f=>f.h))):Math.min(w/f.w,h/f.h),dw=f.w*scale,dh=f.h*scale;
@@ -89,7 +90,7 @@ window.WillyModernArt=(()=>{
   if(!ref)return null;const [bank,n]=ref;
   if(bank==='WILLY')return n<=21?'hero':n<=26?'insect':n>=29&&n<=30?'rocket':null;
   if(bank==='LMAIN')return n<2?'lift':n===2?'sign-arrow':null;
-  if(bank==='L01')return n===0?'lift':n<=3?'clock':n<=11?'go-sign':'stone';
+  if(bank==='L01')return n===0?'lift':n<=3?'clock':n<=11?'go-sign':'prison-grille';
   if(bank==='L02')return n<=2?'green-alien':n<=10?'purple-alien':n<=14?'ice-lift':'gold-bug';
   if(bank==='L03')return n<=3?'orange-alien':n<=12?'stone-lift':n<=16?'plant':n<=20?'green-alien':'coffin';
   if(bank==='L04')return n<=4?'vent':n<=12?'swiss-cheese':n>=21&&n<=28?'swiss-boy':null;
@@ -108,6 +109,11 @@ window.WillyModernArt=(()=>{
  function gradient(g,top,bottom,h){const c=g.createLinearGradient(0,0,0,h);c.addColorStop(0,top);c.addColorStop(1,bottom);return c;}
  function object(g,kind,w,h,phase){
   const metal=gradient(g,'#e2f7ff','#466e89',h),dark='#162c40',cyan='#93f6ff',gold='#ffd375';
+  if(kind==='prison-grille'){
+   // Preserve the original entrance decoration without masking the exit door.
+   g.strokeStyle='#b1c8d4';g.lineWidth=.6;g.strokeRect(.5,.5,w-1,h-1);
+   for(let x=3;x<w;x+=4){g.beginPath();g.moveTo(x,1);g.lineTo(x,h-1);g.stroke();}return;
+  }
   if(kind.endsWith('lift')||kind==='lift'){
    const tint=kind==='neon-lift'?'#eda4ff':kind==='leaf-lift'?'#a0ef90':cyan;
    round(g,.4,.5,w-.8,h-1,Math.min(2,h/3),metal,dark);
@@ -162,6 +168,7 @@ window.WillyModernArt=(()=>{
   const w=entity?.w||Math.max(8,desc.w-8),h=entity?.h||desc.h,phase=time*5+(entity?.id||0);
   if(entity?.dirX)flip=kind==='knight'?entity.dirX>0:entity.dirX<0;
   g.save();g.globalAlpha=alpha;
+  if(kind==='clock'&&sheets.finale.ready){const ok=atlas(g,'finale',1,x,y,w,h,flip);g.restore();return ok;}
   if(kind==='hero'){hero(g,{...entity,x,y,face:flip?-1:1,vx:entity?.dx?40:0,grounded:true},time,false,false,entity);g.restore();return sheets.hero.ready;}
   if(Object.hasOwn(characters,kind)){
    const frame=characters[kind],walk=gait(entity,time),flying=['purple-alien','green-alien','bat','insect','moth','wizard'].includes(kind);
@@ -182,5 +189,9 @@ window.WillyModernArt=(()=>{
   if(shooting){const x=p.x+(p.face>0?15:-3);oval(g,x,p.y+7,2,1,'#fff3b1');}
   g.restore();return true;
  }
- return {family,entityFamily,sprite,hero,gait,deform,ready:()=>Object.values(sheets).every(s=>s.ready)};
+ function finaleDog(g,time){
+  const breath=(1+Math.sin(time*2.4))*.18;
+  return atlas(g,'finale',0,410,344+breath,28,24-breath);
+ }
+ return {family,entityFamily,sprite,hero,gait,deform,finaleDog,ready:()=>Object.values(sheets).every(s=>s.ready)};
 })();

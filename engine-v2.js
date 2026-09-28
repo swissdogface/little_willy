@@ -15,6 +15,8 @@ class Game {
   const heart=HEART_POSITIONS[this.index];
   if(heart&&this.level.theme)this.items.push({id:this.items.length,x:heart[0],y:heart[1],w:16,h:16,kind:4,taken:false});
   this.enemies=this.level.enemies.map((e,id)=>({...e,id,alive:true,flash:0,dx:0,dy:0,dirX:[1,-1,0,0,1,-1,1,-1][e.direction]||0,dirY:[0,0,-1,1,-1,-1,1,1][e.direction]||0}));
+  // The finale clock is removed entirely, including its contact damage.
+  if(this.level.id===1)this.enemies=this.enemies.filter(e=>{const ref=this.level.spriteMap[e.animation?.[0]?.[1]];return !(ref?.[0]==='L01'&&ref[1]>=1&&ref[1]<=3);});
   this.player={x:this.level.spawn.x+2,y:this.level.spawn.y,w:12,h:16,vx:0,vy:0,face:this.level.facing===12?1:-1,hp:this.startHearts,invincible:1.4,grounded:false,coyote:0,ride:null};
  }
  setGod(on){this.god=!!on;this.emit('god');}

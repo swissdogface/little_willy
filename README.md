@@ -6,7 +6,7 @@ A modern browser remaster of **Little Willy v1.1**, the DOS platform game create
 
 The original 24 maps, world themes and level geometry return with high-resolution cartoon artwork, modern controls, shooting, music, touch support and adjustable difficulty.
 
-**Current version: 2.12.2** · [Play Little Willy](https://little-willy.netlify.app/)
+**Current version: 2.12.3** · [Play Little Willy](https://little-willy.netlify.app/)
 
 ## Highlights
 

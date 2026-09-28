@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.12.3
+
+- Reimagine the final world with a high-resolution moon, orbital spacecraft and illustrated prison.
+- Restore the British Bulldog and final-level sign while retaining the original routes and exit.
+- Remove the clock, including its contact damage.
+
 ## 2.12.2
 
 - Show all six Easy-mode hearts in compact phone layouts.

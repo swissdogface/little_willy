@@ -138,7 +138,7 @@ let map=null,mapId='',finale=new Image();finale.src='finale-original.png';
 const lavaSurface=new Image();lavaSurface.src='lava-surface-hd.png';lavaSurface.onload=()=>{mapId='';};
 const materials=new Image();materials.src='materials-hd.png';materials.onload=()=>{mapId='';};
 const iceBackdrop=new Image();iceBackdrop.src='ice-caves-backdrop.png';iceBackdrop.onload=()=>{mapId='';};
-const finaleBackdrop=new Image();finaleBackdrop.src='finale-backdrop.png';finaleBackdrop.onload=()=>{mapId='';};
+const finaleBackdrop=new Image();finaleBackdrop.src='finale-prison-hd.png';finaleBackdrop.onload=()=>{mapId='';};
 const scenicBackdrops={ruins:new Image(),lava:new Image(),alien:new Image(),station:new Image(),caves:new Image(),moon:new Image()};
 scenicBackdrops.ruins.src='ruins-backdrop.png';scenicBackdrops.lava.src='lava-backdrop.png';scenicBackdrops.alien.src='alien-backdrop.png';
 scenicBackdrops.station.src='station-backdrop.png';
@@ -235,6 +235,15 @@ function modernWorldTiles(g,level){
  for(let i=0;i<960;i++){
   const type=level.tiles[i]>>6;if(type!==1&&type!==2&&type!==3)continue;const x=i%40*16,y=Math.floor(i/40)*16;
   if(type===3)continue; // Preserve the kind of danger, not a generic triangle.
+  if(level.theme==='L01'&&finaleBackdrop.complete&&finaleBackdrop.naturalWidth){
+   // Reuse the painted masonry, while keeping every original tile boundary.
+   const w=finaleBackdrop.naturalWidth,h=finaleBackdrop.naturalHeight;
+   g.drawImage(finaleBackdrop,(i%8)*w/12,h*.887,w/12,h*.105,x,y,16,16);
+   g.strokeStyle='#0c1720';g.lineWidth=.5;g.strokeRect(x+.25,y+.25,15.5,15.5);
+   if(i<40||(level.tiles[i-40]>>6)===0){g.fillStyle='#e6c287';g.fillRect(x,y,16,.65);}
+   if(type===2){g.fillStyle='#a4f3e7';g.fillRect(x+3,y+6.5,10,1);}
+   continue;
+  }
   const grad=g.createLinearGradient(x,y,x+16,y+16);grad.addColorStop(0,palettes[2]);grad.addColorStop(.15,palettes[0]);grad.addColorStop(1,palettes[1]);rounded(g,x+.2,y+.2,15.6,15.6,1.5,grad,palettes[1]);
   g.globalAlpha=.22;g.fillStyle='#fff';g.fillRect(x+1.2,y+1.2,13.6,1.2);g.globalAlpha=1;g.strokeStyle='rgba(6,14,31,.45)';g.lineWidth=.55;g.beginPath();g.moveTo(x+2,y+13);g.lineTo(x+14,y+4);g.stroke();
   if(type===2){g.globalAlpha=.46;g.fillStyle=palettes[2];g.fillRect(x+3,y+6.5,10,1.5);g.globalAlpha=1;}
@@ -253,11 +262,32 @@ function stationSigns(g){
  rounded(g,16,49,108,12,2,'#0b253e','#76d9f4');g.font='bold 6.5px system-ui';g.fillStyle='#d9f7ff';g.fillText('GALACTIC TRAIN  →',70,55);
  g.restore();
 }
+// LEVEL1.DAT contains gameplay landmarks, not just scenery. Rebuild them at
+// their original world positions so the prison entrance still meets the exit.
+function finaleScene(g,level){
+ g.save();
+ if(finaleBackdrop.complete&&finaleBackdrop.naturalWidth){
+  // Align the painted floor with the original walkable ground at y=368.
+  const w=finaleBackdrop.naturalWidth,h=finaleBackdrop.naturalHeight,seam=Math.round(h*.886);
+  g.drawImage(finaleBackdrop,0,0,w,seam,0,0,640,368);
+  g.drawImage(finaleBackdrop,0,seam,w,h-seam,0,368,640,16);
+ }else{g.fillStyle='#0a1930';g.fillRect(0,0,640,384);mapId='';}
+ modernWorldTiles(g,level);
+ const stone=g.createLinearGradient(383,0,400,0);stone.addColorStop(0,'#294252');stone.addColorStop(.4,'#8099a5');stone.addColorStop(1,'#1b3044');
+ rounded(g,383,304,17,64,2,stone,'#bfd4d6');
+ g.strokeStyle='#d9f7f4';g.lineWidth=1;g.beginPath();g.moveTo(391,304);g.lineTo(391,289);g.lineTo(388,293);g.moveTo(391,289);g.lineTo(394,293);g.stroke();
+ g.textAlign='center';g.shadowColor='#041226';g.shadowBlur=7;
+ g.fillStyle='#e1f8ff';g.font='bold 8px system-ui';g.fillText('CONGRATULATIONS!',159,271);
+ g.fillStyle='#fff1c4';g.font='900 24px system-ui';g.fillText('THE LAST LEVEL',159,302);
+ g.font='600 8px system-ui';g.fillStyle='#e5f6ff';g.fillText('One final adventure. Bring your family home.',159,320);
+ g.shadowBlur=0;g.strokeStyle='#eac587';g.lineWidth=.7;g.beginPath();g.moveTo(95,332);g.lineTo(223,332);g.stroke();
+ g.restore();
+}
 function prepare(level){
  const key=level.id+':'+hd;if(key===mapId)return;mapId=key;
  map=document.createElement('canvas');map.width=2560;map.height=1536;const g=map.getContext('2d');g.scale(4,4);g.fillStyle=hd?COLORS[0]:'#000';g.fillRect(0,0,640,384);g.imageSmoothingEnabled=hd;
  if(level.id===1){
-  if(hd&&finaleBackdrop.complete&&finaleBackdrop.naturalWidth){g.drawImage(finaleBackdrop,0,0,640,384);modernWorldTiles(g,level);}
+  if(hd){finaleScene(g,level);}
   else if(hd&&WILLY_ART.finale){g.drawImage(renderShape(WILLY_ART.finale,'finale'),0,0,640,384);if(materials.complete&&materials.naturalWidth){const p=new Path2D();for(const [color,loops] of WILLY_ART.finale.paths)if(color===4||color===12)for(const loop of loops)contour(p,loop);g.save();g.clip(p,'evenodd');g.fillStyle=materialPattern(g,2);g.fillRect(0,0,640,384);g.restore();}}
   else if(finale.complete&&finale.naturalWidth)g.drawImage(finale,0,0,640,384);else{mapId='';return;}
  }
@@ -351,6 +381,7 @@ function draw(g,game,view,time){
  time=game.time??time;
  prepare(game.level);g.save();g.beginPath();g.rect(view.x,view.y,view.w,view.h);g.clip();g.fillStyle='#08101c';g.fillRect(view.x,view.y,view.w,view.h);g.translate(view.x-view.camX*view.scale,view.y-view.camY*view.scale);g.scale(view.scale,view.scale);g.imageSmoothingEnabled=hd;
  if(map)g.drawImage(map,0,0,640,384);
+ if(hd&&game.level.id===1)window.WillyModernArt?.finaleDog?.(g,time);
  for(const e of game.level.extras)sprite(g,game.level,e.sprite,e.x,e.y,false,1,time);
  for(const d of game.level.doors){
   const done=game.done.includes(d.id),near=game.nearDoor?.id===d.id;
